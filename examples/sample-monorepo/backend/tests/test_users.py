@@ -1,5 +1,11 @@
 """Minimal test suite for the sample monorepo."""
-from backend.app.services.user_service import get_user
+import sys
+from pathlib import Path
+
+# Allow running from backend/ directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.services.user_service import get_user
 
 
 def test_get_user_returns_dict():

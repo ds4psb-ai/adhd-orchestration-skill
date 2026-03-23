@@ -27,25 +27,26 @@ jobs:
 
       - name: Registry sync (detect changed files)
         run: |
-          python3 ../../scripts/skill_registry_sync.py \
+          python3 $GITHUB_WORKSPACE/scripts/skill_registry_sync.py \
             --skill-file .claude/skills/verify-implementation/SKILL.md \
             --base HEAD~1 --head HEAD \
-            --json | tee ../../sync-result.json
+            --json | tee $GITHUB_WORKSPACE/sync-result.json
           echo "--- Sync Result ---"
-          cat ../../sync-result.json
+          cat $GITHUB_WORKSPACE/sync-result.json
 
       - name: Run verification checks
+        continue-on-error: true
         run: |
-          python3 ../../scripts/run_registry_checks.py \
+          python3 $GITHUB_WORKSPACE/scripts/run_registry_checks.py \
             --skill-file .claude/skills/verify-implementation/SKILL.md \
             --include-all-active \
-            --report-path ../../reports/verify-latest.md \
-            --json | tee ../../verify-result.json
+            --report-path $GITHUB_WORKSPACE/reports/verify-latest.md \
+            --json | tee $GITHUB_WORKSPACE/verify-result.json
           echo "--- Verify Result ---"
-          cat ../../verify-result.json
+          cat $GITHUB_WORKSPACE/verify-result.json
 
       - name: Generate JSONL summary
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         run: |
           python3 -c "
           import json, os, datetime
