@@ -1,11 +1,22 @@
 # ADHD Orchestration Skill for Claude Code
 
+[![ADHD Verify Pipeline](https://github.com/ds4psb-ai/adhd-orchestration-skill/actions/workflows/verify-pipeline.yml/badge.svg)](https://github.com/ds4psb-ai/adhd-orchestration-skill/actions/workflows/verify-pipeline.yml)
+
 > **Scatter-to-Converge**: A multi-terminal orchestration system designed for developers with ADHD who build excellent skeletons across parallel sessions but struggle with completion.
 
 **Author**: [ds4psb-ai](https://github.com/ds4psb-ai/)
 **License**: MIT
 **Platform**: [Claude Code](https://claude.com/claude-code) (Anthropic CLI)
 **Models**: Claude Opus 4.6 (lead) + GPT-5.4 via Codex CLI (challenger, optional)
+
+## Quick Start
+
+```bash
+# Install into any Claude Code project (run from repo root)
+bash <(curl -fsSL https://raw.githubusercontent.com/ds4psb-ai/adhd-orchestration-skill/main/install.sh)
+```
+
+This installs all skills, hooks, scripts, and commands into your `.claude/` directory. See [Installation](#installation) for manual setup.
 
 ---
 
@@ -275,9 +286,37 @@ adhd-orchestration-skill/
 ├── hooks/
 │   ├── skill-witness.sh           # Stop hook: debate output completeness
 │   └── explore-witness.sh         # SubagentStop hook: ≥3 findings gate
-└── commands/
-    └── checkpoint.md               # Session persistence
+├── commands/
+│   └── checkpoint.md               # Session persistence
+├── examples/
+│   └── sample-monorepo/            # Demo: backend + frontend with verify registry
+├── .github/
+│   └── workflows/
+│       └── verify-pipeline.yml     # CI: registry sync → checks → JSONL report
+└── install.sh                       # One-liner installer
 ```
+
+## CI Pipeline
+
+The repo includes a GitHub Actions workflow that demonstrates the full `/adhd → /tkm → /verify-implementation` pipeline on every push:
+
+1. **Registry Sync** — `skill_registry_sync.py` detects changed files and auto-extends the check registry
+2. **Verification Run** — `run_registry_checks.py` executes all active checks against the sample monorepo
+3. **JSONL Report** — appends a structured summary to `adhd-runs.jsonl`
+4. **Install Test** — verifies `install.sh` works on a clean git repo
+
+Reports are uploaded as CI artifacts. Example JSONL output:
+
+```json
+{"event":"ci_verify","sha":"abc123","ref":"main","timestamp":"2026-03-23T12:00:00Z","changed_files":5,"executed_checks":5,"pass_count":4,"fail_count":0,"manual_count":1,"sync_matched":3,"sync_created":0}
+```
+
+### Sample Monorepo
+
+`examples/sample-monorepo/` contains a minimal backend + frontend project with:
+- **Intentional stubs** (`NotImplementedError` in `user_service.py`) — what `/adhd` Phase A would detect as gaps
+- **Pre-populated verify registry** — 5 checks (pytest, build, typecheck, stub-detector, gap-detector)
+- **Passing tests** — demonstrates the Before/After regression gate
 
 ## Contributing
 

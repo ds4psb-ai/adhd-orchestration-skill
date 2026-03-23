@@ -1,0 +1,113 @@
+name: ADHD Verify Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify-sample:
+    name: Run verify-implementation on sample monorepo
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/sample-monorepo
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Registry sync (detect changed files)
+        run: |
+          python3 ../../scripts/skill_registry_sync.py \
+            --skill-file .claude/skills/verify-implementation/SKILL.md \
+            --base HEAD~1 --head HEAD \
+            --json | tee ../../sync-result.json
+          echo "--- Sync Result ---"
+          cat ../../sync-result.json
+
+      - name: Run verification checks
+        run: |
+          python3 ../../scripts/run_registry_checks.py \
+            --skill-file .claude/skills/verify-implementation/SKILL.md \
+            --include-all-active \
+            --report-path ../../reports/verify-latest.md \
+            --json | tee ../../verify-result.json
+          echo "--- Verify Result ---"
+          cat ../../verify-result.json
+
+      - name: Generate JSONL summary
+        working-directory: .
+        run: |
+          python3 -c "
+          import json, os, datetime
+          verify = json.load(open('verify-result.json'))
+          sync = json.load(open('sync-result.json'))
+          entry = {
+              'event': 'ci_verify',
+              'sha': os.environ.get('GITHUB_SHA', 'local')[:8],
+              'ref': os.environ.get('GITHUB_REF_NAME', 'local'),
+              'timestamp': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+              **verify,
+              'sync_matched': sync.get('matched_count', 0),
+              'sync_created': sync.get('created_count', 0),
+          }
+          line = json.dumps(entry, ensure_ascii=False)
+          print(line)
+          with open('adhd-runs.jsonl', 'a') as f:
+              f.write(line + '\n')
+          "
+          echo "--- JSONL ---"
+          cat adhd-runs.jsonl
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adhd-verify-report
+          path: |
+            reports/verify-latest.md
+            adhd-runs.jsonl
+            verify-result.json
+
+  install-test:
+    name: Test install.sh on clean project
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create a fake project
+        run: |
+          mkdir /tmp/test-project && cd /tmp/test-project && git init
+
+      - name: Run installer
+        run: |
+          cd /tmp/test-project
+          bash $GITHUB_WORKSPACE/install.sh
+
+      - name: Verify installed files
+        run: |
+          cd /tmp/test-project
+          echo "--- Checking skill files ---"
+          for skill in adhd tkm tk tkc tktk verify-implementation; do
+            test -f ".claude/skills/$skill/SKILL.md" && echo "✓ $skill" || { echo "✗ $skill MISSING"; exit 1; }
+          done
+          echo "--- Checking scripts ---"
+          test -f .claude/skills/verify-implementation/scripts/run_registry_checks.py && echo "✓ run_registry_checks.py"
+          test -f .claude/skills/manage-skills/scripts/skill_registry_sync.py && echo "✓ skill_registry_sync.py"
+          echo "--- Checking hooks ---"
+          test -x .claude/hooks/skill-witness.sh && echo "✓ skill-witness.sh (executable)"
+          test -x .claude/hooks/explore-witness.sh && echo "✓ explore-witness.sh (executable)"
+          echo "--- Checking commands ---"
+          test -f .claude/commands/checkpoint.md && echo "✓ checkpoint.md"
+          echo ""
+          echo "All files verified ✓"
