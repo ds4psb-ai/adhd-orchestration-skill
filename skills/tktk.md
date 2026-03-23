@@ -98,10 +98,10 @@ Round 3 (Claude synthesis → Codex verdict)
 
 **Steps:**
 
-1. **Launch 2-3 Explore agents in parallel** to investigate the topic area deeply.
-   - Agent 1: Direct investigation — read relevant source files, trace call paths, check schemas
+1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
+   - Agent 1: Direct investigation — read ≥2 relevant source files, trace call paths, check schemas.
    - Agent 2: Upstream investigation — trace the ROOT of the pipeline/system being discussed. If the question is about X, investigate what FEEDS X and what X FEEDS INTO.
-   - Agent 3 (if applicable): Historical investigation — git log/blame for the relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
+   - Agent 3: Historical investigation — MUST run unless topic has zero git history (cite why if skipping). git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
 
 2. **Root Cause Probe** — Before forming your position, ask yourself:
    > "Is the proposed change more likely to introduce negatives than positives? What happens if we trace the problem to its true origin instead of patching the symptom?"
@@ -414,7 +414,8 @@ Time cap: 60 seconds. Launch 1-2 Explore agents if needed.
 - **Early exit**: If Codex agrees fully in R1, skip to R3 — but STILL do Phase 1.5 research
 - **Malformed response**: Ignore that round, continue
 - **Session limit**: Max 2 debates per conversation (deeper than /tk, uses more context)
-- **Phase timeout**: If Explore agents >2 min, proceed with gathered evidence. Note incomplete research.
+- **Phase timeout**: If Explore agents >2 min, output `⚠ PHASE [X] INCOMPLETE — [N findings gathered, M agents timed out]` and proceed.
+- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 
 ## Output Format
 

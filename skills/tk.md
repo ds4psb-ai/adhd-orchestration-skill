@@ -89,10 +89,10 @@ Codex retains full thread context across `codex-reply` calls. Resending identica
 
 **Steps:**
 
-1. **Launch 2-3 Explore agents in parallel** to investigate the topic area deeply.
-   - Agent 1: **Direct investigation** — read relevant source files, trace call paths, check schemas.
+1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
+   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths, check schemas.
    - Agent 2: **Upstream investigation** — trace the ROOT of the pipeline/system. If the question is about X, investigate what FEEDS X and what X FEEDS INTO.
-   - Agent 3 (if applicable): **Historical investigation** — git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
+   - Agent 3: **Historical investigation** — MUST run unless topic has zero git history (cite why if skipping). git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
 
 2. **Root Cause Probe** — Before forming your position, ask yourself:
    > "Is the proposed change more likely to introduce negatives than positives? What happens if we trace the problem to its true origin instead of patching the symptom?"
@@ -224,7 +224,7 @@ Before the debate begins, ask Codex to web-research whether better approaches ex
 
 After Codex R1, do NOT just verify claims. **EXPAND investigation AND prepare for final synthesis** — this phase absorbs both Phase 1.5 and Phase 2.5 from the old protocol.
 
-**Hard cap: 3 minutes.** If Explore agents exceed this, proceed with gathered evidence and note gaps.
+**Hard cap: 3 minutes.** If exceeded, output `⚠ PHASE 1.5 INCOMPLETE — [N claims verified, M remaining]` and proceed with gathered evidence.
 
 **Four expansion vectors:**
 
@@ -382,8 +382,9 @@ Your synthesis should be AT LEAST as ambitious as your original proposal, improv
 - **Early exit**: If Codex agrees in Round 1, end early — but STILL do Phase 1.5 MEGA research before final synthesis
 - **Malformed response**: If Codex returns empty or broken output, ignore that round and continue
 - **Session limit**: Max 3 debates per conversation (context management)
-- **Phase 0 timeout**: If Explore agents take too long (>2 min), proceed with whatever evidence was gathered. Note the incomplete research in Evidence Base.
-- **Phase 1.5 MEGA timeout**: Hard cap 3 minutes. Proceed with gathered evidence.
+- **Phase 0 timeout**: If Explore agents >2 min, output `⚠ PHASE 0 INCOMPLETE — [N findings gathered, M agents timed out]` and proceed.
+- **Phase 1.5 MEGA timeout**: Hard cap 3 minutes. If exceeded, output `⚠ PHASE 1.5 INCOMPLETE — [reason]` and proceed.
+- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 
 ## Output Format
 

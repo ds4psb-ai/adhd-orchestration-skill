@@ -58,10 +58,10 @@ Phase 0    (Claude: deep research — Explore agents + web search)
 
 **Steps:**
 
-1. **Launch 2-3 Explore agents in parallel** to investigate the topic area deeply.
-   - Agent 1: **Direct investigation** — read relevant source files, trace call paths, check schemas.
+1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
+   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths, check schemas.
    - Agent 2: **Upstream investigation** — trace the ROOT of the pipeline/system. If the question is about X, investigate what FEEDS X and what X FEEDS INTO.
-   - Agent 3 (if applicable): **Historical investigation** — git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
+   - Agent 3: **Historical investigation** — MUST run unless topic has zero git history (cite why if skipping). git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
 
 2. **Root Cause Probe** — Before forming your position, ask yourself:
    > "Is the proposed change more likely to introduce negatives than positives? What happens if we trace the problem to its true origin instead of patching the symptom?"
@@ -267,7 +267,7 @@ After receiving the challenger's critique, investigate before defending.
    - Check integration concerns
    - Run final DB/code verification
 
-**Hard cap: 3 minutes.** Proceed with gathered evidence if agents exceed this.
+**Hard cap: 3 minutes.** If exceeded, output `⚠ PHASE 2.5 INCOMPLETE — [N claims verified, M remaining]` and proceed with gathered evidence.
 
 ### Phase 3 — Defense + Position Lock + Synthesis + Bias Audit
 
@@ -373,9 +373,10 @@ Present the final synthesized position. Since there is no external verdict:
 ## Stability Guards
 
 - **No MCP dependency**: Entire protocol runs locally. No hang risk.
-- **Subagent timeout**: If challenger subagent takes >5 minutes, proceed with partial results.
-- **Phase 0 timeout**: If Explore agents take >2 min, proceed with gathered evidence.
-- **Phase 2.5 timeout**: Hard cap 3 minutes.
+- **Subagent timeout**: If challenger subagent takes >5 minutes, output `⚠ PHASE 2 INCOMPLETE — challenger timed out` and proceed with self-critique fallback.
+- **Phase 0 timeout**: If Explore agents >2 min, output `⚠ PHASE 0 INCOMPLETE — [N findings gathered]` and proceed.
+- **Phase 2.5 timeout**: Hard cap 3 minutes. If exceeded, output `⚠ PHASE 2.5 INCOMPLETE — [reason]` and proceed.
+- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 - **Session limit**: Max 3 self-debates per conversation (context management).
 - **Malformed subagent response**: If challenger returns empty or broken output, perform self-critique using the 8-point framework as fallback.
 

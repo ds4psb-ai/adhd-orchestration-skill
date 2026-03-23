@@ -59,7 +59,7 @@ Phase A    (RECON: git scan + checkpoint JSON + code gaps → Domain Health Repo
 
 **No routing without thorough diagnosis.** Phase A always runs. Thoroughness > speed.
 
-Launch 3 Explore agents in parallel (all agents: use "very thorough" exploration level):
+Launch ≥3 Explore agents in parallel. Each agent MUST produce ≥3 concrete findings (file paths, commit hashes, or gap descriptions). Agents that return fewer than 3 findings MUST be re-prompted or supplemented.
 
 - **Agent 1: Git History Scanner**
   ```
@@ -462,8 +462,9 @@ Activate: Set environment variable or pass `--stateless` flag.
 
 ## Stability Guards
 
-- Phase A Explore agents timeout: 2 minutes → proceed with partial results
-- TKM invocation timeout: 5 minutes → output DHR without work packages
+- Phase A Explore agents timeout: 2 minutes → output `⚠ PHASE A INCOMPLETE — [agent N timed out, M findings gathered]` and proceed. User sees the marker.
+- TKM invocation timeout: 5 minutes → output `⚠ TKM INCOMPLETE — DHR produced without work packages` and proceed with DHR only.
+- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, missing data, tool failure), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and to `/adhd verify` convergence scanning.
 - Max write-stream count advisory: 4 (warn at >4, hard warn at >6)
 - `/adhd verify` re-enters Phase B at most 2 times
 - Max 1 active ADHD run per domain (prevent overlapping runs)

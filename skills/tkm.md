@@ -53,11 +53,11 @@ Combines evidence collection and problem enumeration into a single phase.
 
 #### Step A: Investigation
 
-Launch 2-3 Explore agents in parallel:
+Launch ≥2 Explore agents in parallel. Each agent MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
 
-- **Agent 1: Direct** — Read relevant source files, trace call paths, check schemas for the problem area.
+- **Agent 1: Direct** — Read ≥2 relevant source files, trace call paths, check schemas for the problem area.
 - **Agent 2: Upstream/Downstream** — What FEEDS the problem area? What CONSUMES its output? Trace the full pipeline.
-- **Agent 3 (if applicable): Historical** — `git log --oneline -20` for relevant files. Look for repeated fixes, threshold churn, regression patterns.
+- **Agent 3: Historical** — MUST run unless topic has zero git history (cite why if skipping). `git log --oneline -20` for relevant files. Look for repeated fixes, threshold churn, regression patterns.
 
 #### Step B: Problem Enumeration
 
@@ -414,8 +414,9 @@ After writing all N documents, output a summary:
 ## Stability Guards
 
 - **No MCP dependency**: Entire protocol runs locally. No hang risk.
-- **Subagent timeout**: If Partition Auditor takes >3 minutes, proceed with self-verified partition.
-- **Phase 1 timeout**: If Explore agents take >2 min each, proceed with gathered evidence.
+- **Subagent timeout**: If Partition Auditor >3 minutes, output `⚠ PHASE 3 INCOMPLETE — audit timed out, using self-verified partition` and proceed.
+- **Phase 1 timeout**: If Explore agents >2 min, output `⚠ PHASE 1 INCOMPLETE — [N findings gathered]` and proceed.
+- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and to `/adhd verify` convergence scanning.
 - **Min/Max documents**: Minimum 1 (degenerate case), Maximum 5 (beyond this, use `/team create` instead).
 - **Large file handling**: If a file >800 lines must be shared between streams, flag it and suggest refactoring as a prerequisite issue in one stream.
 
