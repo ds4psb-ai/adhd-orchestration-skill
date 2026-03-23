@@ -5,7 +5,7 @@
 > **Scatter-to-Converge**: A multi-terminal orchestration system designed for developers with ADHD who build excellent skeletons across parallel sessions but struggle with completion.
 
 **Author**: [ds4psb-ai](https://github.com/ds4psb-ai/)
-**License**: MIT
+**License**: MIT + Attribution
 **Platform**: [Claude Code](https://claude.com/claude-code) (Anthropic CLI)
 **Models**: Claude Opus 4.6 (lead) + GPT-5.4 via Codex CLI (challenger, optional)
 
@@ -211,7 +211,7 @@ chmod +x .claude/hooks/*.sh
 
 ```bash
 # Install Codex CLI
-npm install -g @anthropic-ai/codex
+npm install -g @openai/codex
 
 # Configure model in ~/.codex/config.toml
 # The skills will use whatever model is configured there
