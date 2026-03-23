@@ -324,4 +324,14 @@ Issues and PRs welcome at [github.com/ds4psb-ai](https://github.com/ds4psb-ai/).
 
 ## License
 
-MIT
+MIT + Attribution — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+You are free to use, modify, and distribute this project. **Attribution is required:**
+
+> Built with [ADHD Orchestration Skill](https://github.com/ds4psb-ai/adhd-orchestration-skill) by ds4psb-ai
+
+This notice must be preserved in forks and derivative works.
+
+---
+
+<sub>Copyright (c) 2026 [ds4psb-ai](https://github.com/ds4psb-ai). All skill files, hooks, and scripts in this repository are watermarked with origin metadata.</sub>

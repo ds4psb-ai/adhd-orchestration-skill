@@ -503,3 +503,5 @@ If called without arguments, use the current session context (recent discussion,
 `--docs N` forces specific document count (overrides auto-detection).
 `--from-run <run-id>` loads existing DHR from ADHD run (skips Phase 1).
 `--json` writes stream contract JSON files alongside markdown documents.
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

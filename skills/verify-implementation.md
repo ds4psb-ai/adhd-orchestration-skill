@@ -77,3 +77,5 @@ Populate this registry with your project's checks. The `skill_registry_sync.py` 
 | frontend-build | frontend/** | cd frontend && npm run build | baseline | active | 2026-01-01 |
 | frontend-typecheck | frontend/src/** | cd frontend && npm run typecheck | baseline | active | 2026-01-01 |
 <!-- REGISTRY:END -->
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

@@ -291,3 +291,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+# Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | (c) 2026 ds4psb-ai

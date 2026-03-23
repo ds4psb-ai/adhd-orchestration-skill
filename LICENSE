@@ -1,0 +1,36 @@
+MIT License
+
+Copyright (c) 2026 ds4psb-ai (https://github.com/ds4psb-ai)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+2. ATTRIBUTION REQUIREMENT: Any project, product, or publication that uses,
+   adapts, or is derived from this Software must include the following
+   attribution in a prominent location (e.g., README, documentation, or
+   about page):
+
+     "Built with ADHD Orchestration Skill by ds4psb-ai
+      https://github.com/ds4psb-ai/adhd-orchestration-skill"
+
+   This attribution must remain intact in derivative works and forks.
+   Removing or obscuring this attribution is a violation of this license.
+
+3. NOTICE FILE: If a NOTICE file is included with the Software, its contents
+   must be preserved and distributed with any copies or substantial portions
+   of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

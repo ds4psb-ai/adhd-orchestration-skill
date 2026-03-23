@@ -119,3 +119,5 @@ Append a one-line entry to `~/.claude/adhd-runs.jsonl` if this checkpoint is par
 ```json
 {"event": "checkpoint", "run_id": "<id>", "stream_id": "<id>", "topic": "<topic>", "progress_pct": 75, "base_sha": "<sha>", "timestamp": "YYYY-MM-DDTHH:MM:SSZ"}
 ```
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

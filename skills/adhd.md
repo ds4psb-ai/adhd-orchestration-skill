@@ -527,3 +527,5 @@ For `/adhd verify`:
 ### Verification Mesh
 {verify-implementation + verify-ui-consistency results}
 ```
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

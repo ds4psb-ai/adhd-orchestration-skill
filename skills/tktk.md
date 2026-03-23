@@ -483,3 +483,5 @@ Time cap: 60 seconds. Launch 1-2 Explore agents if needed.
 
 If called with arguments, use them as the debate topic.
 If called without arguments, debate the current task or most recent discussion topic.
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

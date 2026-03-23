@@ -20,3 +20,5 @@ if [[ -n "$MISSING" ]]; then
   exit 2
 fi
 exit 0
+
+# Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | (c) 2026 ds4psb-ai

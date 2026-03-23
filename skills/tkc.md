@@ -445,3 +445,5 @@ Present each phase clearly:
 
 If called with arguments, use them as the debate topic.
 If called without arguments, debate the current task, problem, or most recent discussion topic in context.
+
+<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->
