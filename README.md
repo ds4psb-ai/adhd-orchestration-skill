@@ -30,11 +30,11 @@ High-intelligence ADHD developers build great foundations across 4+ parallel ses
 ## Architecture — 5-Layer Stack
 
 ```
-Layer 0: State Harness    — hooks + witness mesh + JSON state + SHA tracking + observability
-Layer 1: ADHD Router      — diagnose / route / dispatch / converge (thin, never implements)
-Layer 2: Reasoning Skills  — TKM / TKC / TK / TKTK (each sovereign, dual-mode)
-Layer 3: Persistence      — checkpoint + run manifest + stream state + convergence
-Layer 4: Verification Mesh — verify-implementation hub + domain verifiers
+Layer 0: State Harness      — hooks + witness mesh + JSON state + SHA tracking + observability
+Layer 1: ADHD Router        — diagnose / route / dispatch / converge (thin, never implements)
+Layer 2: Reasoning Skills   — TKM / TKC / TK / TKTK (each sovereign, dual-mode)
+Layer 3: Persistence        — checkpoint + run manifest + stream state + convergence
+Layer 4: Verification Mesh  — verify-implementation (diff-aware registry) + domain verifiers
 ```
 
 ## Skill Inventory
@@ -46,6 +46,7 @@ Layer 4: Verification Mesh — verify-implementation hub + domain verifiers
 | **TK** | `skills/tk.md` | 2-round Claude↔Codex debate with SoTA probe + Position Lock | YES (requires Codex MCP) |
 | **TKC** | `skills/tkc.md` | Context-isolated self-debate with persona inversion + bias audit | YES (no MCP needed) |
 | **TKTK** | `skills/tktk.md` | 3-round deep research debate with inter-round investigation | YES (requires Codex MCP) |
+| **Verify** | `skills/verify-implementation.md` | Diff-aware dynamic check registry with Before/After revalidation | YES |
 | **Checkpoint** | `commands/checkpoint.md` | Session state persistence with SHA-based staleness tracking | YES |
 
 ### Sovereignty Protocol
@@ -167,7 +168,14 @@ cp skills/tkm.md    .claude/skills/tkm/SKILL.md
 cp skills/tk.md     .claude/skills/tk/SKILL.md
 cp skills/tkc.md    .claude/skills/tkc/SKILL.md
 cp skills/tktk.md   .claude/skills/tktk/SKILL.md
+cp skills/verify-implementation.md .claude/skills/verify-implementation/SKILL.md
 cp commands/checkpoint.md .claude/commands/checkpoint.md
+
+# Copy verification scripts
+mkdir -p .claude/skills/verify-implementation/scripts
+mkdir -p .claude/skills/manage-skills/scripts
+cp scripts/run_registry_checks.py .claude/skills/verify-implementation/scripts/
+cp scripts/skill_registry_sync.py .claude/skills/manage-skills/scripts/
 
 # Copy witness mesh hooks (optional but recommended)
 cp hooks/skill-witness.sh  .claude/hooks/skill-witness.sh
@@ -184,6 +192,7 @@ chmod +x .claude/hooks/*.sh
 - `/tk` — Claude↔Codex 2-round debate
 - `/tkc` — Claude self-debate (no MCP needed)
 - `/tktk` — Deep 3-round research debate
+- `/verify-implementation` — Diff-aware verification with dynamic check registry
 - `/checkpoint` — Session state persistence
 ```
 
@@ -221,6 +230,9 @@ npm install -g @anthropic-ai/codex
 # Deep research debate
 /tktk "Event sourcing vs CQRS for audit trail"
 
+# Diff-aware verification (runs only checks matching changed files)
+/verify-implementation
+
 # Save session state for cross-session continuity
 /checkpoint
 ```
@@ -249,18 +261,22 @@ npm install -g @anthropic-ai/codex
 
 ```
 adhd-orchestration-skill/
-├── README.md                 # This file
+├── README.md                       # This file
 ├── skills/
-│   ├── adhd.md              # Mothership orchestrator
-│   ├── tkm.md               # Work package generator
-│   ├── tk.md                # Claude↔Codex 2-round debate
-│   ├── tkc.md               # Claude self-debate
-│   └── tktk.md              # Deep 3-round research debate
+│   ├── adhd.md                    # Mothership orchestrator
+│   ├── tkm.md                     # Work package generator
+│   ├── tk.md                      # Claude↔Codex 2-round debate
+│   ├── tkc.md                     # Claude self-debate
+│   ├── tktk.md                    # Deep 3-round research debate
+│   └── verify-implementation.md   # Diff-aware verification mesh
+├── scripts/
+│   ├── run_registry_checks.py     # Execute registry checks + report
+│   └── skill_registry_sync.py     # Auto-extend registry from git diff
 ├── hooks/
-│   ├── skill-witness.sh     # Stop hook: debate output completeness
-│   └── explore-witness.sh   # SubagentStop hook: ≥3 findings gate
+│   ├── skill-witness.sh           # Stop hook: debate output completeness
+│   └── explore-witness.sh         # SubagentStop hook: ≥3 findings gate
 └── commands/
-    └── checkpoint.md         # Session persistence
+    └── checkpoint.md               # Session persistence
 ```
 
 ## Contributing
