@@ -241,12 +241,12 @@ npm install -g @anthropic-ai/codex
 
 | Trap | Recognition | Correction |
 |------|-------------|------------|
-| "한 터미널에서 다 하자" | 2+ gaps, not distributing | Tier 2 is DEFAULT → distribute |
-| "나중에 합치면 되지" | No checkpoint at session end | `/checkpoint` is MANDATORY |
-| "이것도 빨리 고치자" | Drifting to another domain | Stay on current domain |
-| "대충 되겠지" | Skipping diagnosis | RECON is mandatory |
-| "이거 Tier 0이지" | Underestimating complexity | If uncertain → Tier 2 |
-| "Gap 1개네" | Counting by category | Count INDIVIDUAL items |
+| "I'll do it all in one terminal" | 2+ gaps, not distributing | Tier 2 is DEFAULT → distribute |
+| "I'll merge it later" | No checkpoint at session end | `/checkpoint` is MANDATORY |
+| "Let me quickly fix this too" | Drifting to another domain | Stay on current domain |
+| "It'll probably be fine" | Skipping diagnosis | RECON is mandatory |
+| "This is just Tier 0" | Underestimating complexity | If uncertain → Tier 2 |
+| "That's only 1 gap" | Counting by category | Count INDIVIDUAL items |
 
 ## Key Design Decisions
 
