@@ -25,29 +25,30 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest
 
-      - name: Registry sync (detect changed files)
+      - name: Registry sync + verify + JSONL report
+        working-directory: ${{ github.workspace }}
         run: |
+          cd examples/sample-monorepo
+
+          echo "=== Registry Sync ==="
           python3 $GITHUB_WORKSPACE/scripts/skill_registry_sync.py \
             --skill-file .claude/skills/verify-implementation/SKILL.md \
             --base HEAD~1 --head HEAD \
-            --json | tee $GITHUB_WORKSPACE/sync-result.json
-          echo "--- Sync Result ---"
+            --json > $GITHUB_WORKSPACE/sync-result.json || true
           cat $GITHUB_WORKSPACE/sync-result.json
 
-      - name: Run verification checks
-        continue-on-error: true
-        run: |
+          echo ""
+          echo "=== Verification Checks ==="
           python3 $GITHUB_WORKSPACE/scripts/run_registry_checks.py \
             --skill-file .claude/skills/verify-implementation/SKILL.md \
             --include-all-active \
             --report-path $GITHUB_WORKSPACE/reports/verify-latest.md \
-            --json | tee $GITHUB_WORKSPACE/verify-result.json
-          echo "--- Verify Result ---"
+            --json > $GITHUB_WORKSPACE/verify-result.json || true
           cat $GITHUB_WORKSPACE/verify-result.json
 
-      - name: Generate JSONL summary
-        working-directory: ${{ github.workspace }}
-        run: |
+          echo ""
+          echo "=== JSONL Summary ==="
+          cd $GITHUB_WORKSPACE
           python3 -c "
           import json, os, datetime
           verify = json.load(open('verify-result.json'))
@@ -66,7 +67,6 @@ jobs:
           with open('adhd-runs.jsonl', 'a') as f:
               f.write(line + '\n')
           "
-          echo "--- JSONL ---"
           cat adhd-runs.jsonl
 
       - name: Upload reports
