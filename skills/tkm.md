@@ -1,6 +1,17 @@
 ---
 name: tkm
 description: "Tiki-Taka Meta-prompt Factory (TKM) — Parallel Work Package Generator. Decomposes complex multi-subsystem problems into N self-contained, conflict-free work packages for parallel execution."
+hooks:
+  SubagentStop:
+    - matcher: "Explore"
+      hooks:
+        - type: command
+          command: ".claude/hooks/explore-witness.sh"
+  StopFailure:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: "echo '{\"event\":\"stop_failure\",\"skill\":\"tkm\",\"ts\":\"'$(date -u +%FT%TZ)'\"}' >> ~/.claude/adhd-runs.jsonl"
 ---
 
 # Tiki-Taka Meta-prompt Factory (TKM) — Parallel Work Package Generator
@@ -43,9 +54,14 @@ Phase 1  (Deep Investigation + Problem Inventory)
       → Phase 4  (Document Expansion + Cross-Stream Contracts + Write Files)
 ```
 
+## Incomplete Phase Convention
+
+If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and to `/adhd verify` convergence scanning.
+
 ## Protocol
 
 ### Phase 1 — Deep Investigation + Problem Inventory (MANDATORY)
+> **Exit contract**: ≥2 agents, ≥3 findings each, Problem Inventory Table + File Dependency Map. INCOMPLETE if timeout.
 
 **No partitioning is permitted until Phase 1 is complete.**
 
@@ -92,6 +108,7 @@ For all files involved in unresolved problems, build:
 This map is the input for Phase 2 partitioning and Phase 3 conflict audit.
 
 ### Phase 2 — Skeleton: Partition into N Streams
+> **Exit contract**: N-stream partition with zero file conflicts + method recommendations per stream.
 
 Decide how many documents to generate and what each covers.
 
@@ -161,6 +178,7 @@ For each document, recommend the execution method:
 ```
 
 ### Phase 3 — Partition Auditor (SUBAGENT)
+> **Exit contract**: Subagent PASS/FAIL per audit category. INCOMPLETE if timeout >3min.
 
 Spawn a fresh-context subagent to audit the partition for conflicts and gaps.
 
@@ -235,6 +253,7 @@ For each stream's document, verify:
 **Post-audit:** Apply recommended fixes. If FAIL on File Overlap or Import Conflicts → revise partition before proceeding.
 
 ### Phase 4 — Document Expansion + Write Files
+> **Exit contract**: N self-contained markdown docs written + cross-stream summary with conflict matrix.
 
 Write N markdown files. Each document must be **self-contained** — a developer in a fresh terminal with no prior context can execute it.
 
@@ -416,7 +435,6 @@ After writing all N documents, output a summary:
 - **No MCP dependency**: Entire protocol runs locally. No hang risk.
 - **Subagent timeout**: If Partition Auditor >3 minutes, output `⚠ PHASE 3 INCOMPLETE — audit timed out, using self-verified partition` and proceed.
 - **Phase 1 timeout**: If Explore agents >2 min, output `⚠ PHASE 1 INCOMPLETE — [N findings gathered]` and proceed.
-- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and to `/adhd verify` convergence scanning.
 - **Min/Max documents**: Minimum 1 (degenerate case), Maximum 5 (beyond this, use `/team create` instead).
 - **Large file handling**: If a file >800 lines must be shared between streams, flag it and suggest refactoring as a prerequisite issue in one stream.
 

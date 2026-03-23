@@ -1,6 +1,22 @@
 ---
 name: tk
 description: "Tiki-Taka v2: 2-round Claude↔Codex debate with SoTA probe, root cause tracing, and Position Lock. Use when user says /tk, tiki-taka, debate, or asks for Codex opinion."
+hooks:
+  Stop:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: ".claude/hooks/skill-witness.sh"
+  SubagentStop:
+    - matcher: "Explore"
+      hooks:
+        - type: command
+          command: ".claude/hooks/explore-witness.sh"
+  StopFailure:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: "echo '{\"event\":\"stop_failure\",\"skill\":\"tk\",\"ts\":\"'$(date -u +%FT%TZ)'\"}' >> ~/.claude/adhd-runs.jsonl"
 ---
 
 # Tiki-Taka Debate v2 (2 Rounds) — Research-First Protocol
@@ -81,9 +97,14 @@ Codex retains full thread context across `codex-reply` calls. Resending identica
 
 **Key principle:** Each Codex call should contain only NEW information. Prior context is preserved in the thread.
 
+## Incomplete Phase Convention
+
+If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
+
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY, before any Codex call)
+> **Exit contract**: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated. INCOMPLETE if timeout.
 
 **RULE: No Codex MCP call is permitted until Phase 0 is complete.** Even for short questions, you MUST gather evidence first.
 
@@ -122,6 +143,7 @@ Codex retains full thread context across `codex-reply` calls. Resending identica
 **FORBIDDEN:** Calling `mcp__codex-cli__codex` without a completed Evidence Base. If you catch yourself about to skip Phase 0, STOP and investigate first.
 
 ### Phase 0.5 — Codex State-of-the-Art Probe
+> **Exit contract**: Codex web research on 4 dimensions returned. Fallback: Claude web search if MCP fails.
 
 Before the debate begins, ask Codex to web-research whether better approaches exist.
 
@@ -163,6 +185,7 @@ Before the debate begins, ask Codex to web-research whether better approaches ex
 **Integrate** Codex's web findings into your Evidence Base before proceeding to Round 1.
 
 ### Round 1 — Opening
+> **Exit contract**: Claude proposal + Codex 8-point critique + component ledger. INCOMPLETE if MCP fails.
 
 1. **Claude** conducts a 90-second **Pre-Proposal Investigation** triggered by Phase 0.5 findings, then presents a bold proposal.
 
@@ -221,6 +244,7 @@ Before the debate begins, ask Codex to web-research whether better approaches ex
 3. **Present** Codex's response to the user
 
 ### Phase 1.5 MEGA — Expanded Investigation + Pre-Synthesis
+> **Exit contract**: All Codex claims verified/expanded, pre-synthesis prepared. INCOMPLETE if >3min.
 
 After Codex R1, do NOT just verify claims. **EXPAND investigation AND prepare for final synthesis** — this phase absorbs both Phase 1.5 and Phase 2.5 from the old protocol.
 
@@ -259,6 +283,7 @@ After Codex R1, do NOT just verify claims. **EXPAND investigation AND prepare fo
 4. Compile results as Phase 1.5 MEGA Evidence Update
 
 ### Round 2 FINAL — Defense + Position Lock + Synthesis → Verdict
+> **Exit contract**: Category A/B/C filtering + Position Lock + Scope Report + Codex verdict + witness block.
 
 This is the FINAL exchange. No Round 3.
 
@@ -384,7 +409,6 @@ Your synthesis should be AT LEAST as ambitious as your original proposal, improv
 - **Session limit**: Max 3 debates per conversation (context management)
 - **Phase 0 timeout**: If Explore agents >2 min, output `⚠ PHASE 0 INCOMPLETE — [N findings gathered, M agents timed out]` and proceed.
 - **Phase 1.5 MEGA timeout**: Hard cap 3 minutes. If exceeded, output `⚠ PHASE 1.5 INCOMPLETE — [reason]` and proceed.
-- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 
 ## Output Format
 
@@ -415,6 +439,9 @@ Present each phase clearly:
 
 ### Decision
 {final decision with reasoning}
+
+### Witness Block (MUST — append at end of debate output)
+{"witness":{"skill":"tk","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}
 ```
 
 ## Arguments

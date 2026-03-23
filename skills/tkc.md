@@ -1,6 +1,22 @@
 ---
 name: tkc
 description: "Tiki-Taka Claude Self-Debate: Context-isolated subagent debate with persona inversion and bias audit. Use when user says /tkc, self-debate, or when Codex MCP is unavailable but structured debate is needed."
+hooks:
+  Stop:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: ".claude/hooks/skill-witness.sh"
+  SubagentStop:
+    - matcher: "Explore"
+      hooks:
+        - type: command
+          command: ".claude/hooks/explore-witness.sh"
+  StopFailure:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: "echo '{\"event\":\"stop_failure\",\"skill\":\"tkc\",\"ts\":\"'$(date -u +%FT%TZ)'\"}' >> ~/.claude/adhd-runs.jsonl"
 ---
 
 # Tiki-Taka Claude Self-Debate (TKC) — Context Isolation Protocol
@@ -50,9 +66,14 @@ Phase 0    (Claude: deep research — Explore agents + web search)
 | 5 | Blind evidence (no interpretation) | Forces independent analysis |
 | 6 | Self-bias audit (Phase 3C) | Post-hoc detection of residual bias |
 
+## Incomplete Phase Convention
+
+If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
+
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY)
+> **Exit contract**: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated. INCOMPLETE if timeout.
 
 **RULE: No proposal is permitted until Phase 0 is complete.** Even for short questions, gather evidence first.
 
@@ -89,6 +110,7 @@ Phase 0    (Claude: deep research — Explore agents + web search)
    ```
 
 ### Phase 0.5 — SoTA Self-Research (replaces Codex probe)
+> **Exit contract**: 4 research dimensions covered via WebSearch/tavily. INCOMPLETE if all searches fail.
 
 Claude performs its own state-of-the-art research using WebSearch + tavily.
 
@@ -135,6 +157,7 @@ If even ONE condition fails → MUST execute web research.
 - "[technique] alternatives comparison" (e.g., "cosine similarity alternatives comparison")
 
 ### Phase 1 — Bold Proposal with Commitment Markers
+> **Exit contract**: Root-cause-backed proposal + ≥2 I COMMIT markers with confidence levels.
 
 Present a bold proposal grounded in Phase 0 evidence + Phase 0.5 web findings:
 
@@ -161,6 +184,7 @@ Present a bold proposal grounded in Phase 0 evidence + Phase 0.5 web findings:
    These markers serve as anchors for the Phase 3 bias audit.
 
 ### Phase 1.5 — Context Packet Preparation
+> **Exit contract**: Context packet with proposal + raw evidence only (no reasoning chain).
 
 **This is /tkc's core innovation.** Prepare the Context Packet for the blind challenger.
 
@@ -190,6 +214,7 @@ Present a bold proposal grounded in Phase 0 evidence + Phase 0.5 web findings:
 | Default | **Devil's Advocate Researcher** ("Let me find counter-evidence") | Counter-evidence, alternative explanations |
 
 ### Phase 2 — Blind Challenger (SUBAGENT)
+> **Exit contract**: Subagent 8-point critique + disagreement ledger + score. INCOMPLETE if timeout >5min.
 
 Spawn a fresh-context subagent using the **Agent tool**.
 
@@ -241,6 +266,7 @@ Final disagreement score: __/10
 **Post-subagent:** If challenger's disagreement score <5/10, the critique is likely too weak. Note this in Phase 3 bias audit but proceed (do NOT re-spawn).
 
 ### Phase 2.5 — Investigation (Verify + Expand Challenger Claims)
+> **Exit contract**: Each challenger claim verified/expanded with code evidence. INCOMPLETE if >3min.
 
 After receiving the challenger's critique, investigate before defending.
 
@@ -270,6 +296,7 @@ After receiving the challenger's critique, investigate before defending.
 **Hard cap: 3 minutes.** If exceeded, output `⚠ PHASE 2.5 INCOMPLETE — [N claims verified, M remaining]` and proceed with gathered evidence.
 
 ### Phase 3 — Defense + Position Lock + Synthesis + Bias Audit
+> **Exit contract**: Category A/B/C filtering + Position Lock + Scope Report + Bias Audit + witness block.
 
 #### Section A — Defense
 
@@ -376,7 +403,6 @@ Present the final synthesized position. Since there is no external verdict:
 - **Subagent timeout**: If challenger subagent takes >5 minutes, output `⚠ PHASE 2 INCOMPLETE — challenger timed out` and proceed with self-critique fallback.
 - **Phase 0 timeout**: If Explore agents >2 min, output `⚠ PHASE 0 INCOMPLETE — [N findings gathered]` and proceed.
 - **Phase 2.5 timeout**: Hard cap 3 minutes. If exceeded, output `⚠ PHASE 2.5 INCOMPLETE — [reason]` and proceed.
-- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, tool failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 - **Session limit**: Max 3 self-debates per conversation (context management).
 - **Malformed subagent response**: If challenger returns empty or broken output, perform self-critique using the 8-point framework as fallback.
 
@@ -410,6 +436,9 @@ Present each phase clearly:
 
 ### Decision
 {Final position + debate delta + bias audit summary}
+
+### Witness Block (MUST — append at end of debate output)
+{"witness":{"skill":"tkc","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}
 ```
 
 ## Arguments

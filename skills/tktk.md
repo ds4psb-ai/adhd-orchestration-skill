@@ -1,6 +1,22 @@
 ---
 name: tktk
 description: "Tiki-Taka Deep Research: 3-round Claude↔Codex debate with mandatory inter-round investigation. Use when deep root-cause analysis and state-of-the-art comparison are needed."
+hooks:
+  Stop:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: ".claude/hooks/skill-witness.sh"
+  SubagentStop:
+    - matcher: "Explore"
+      hooks:
+        - type: command
+          command: ".claude/hooks/explore-witness.sh"
+  StopFailure:
+    - matcher: ""
+      hooks:
+        - type: command
+          command: "echo '{\"event\":\"stop_failure\",\"skill\":\"tktk\",\"ts\":\"'$(date -u +%FT%TZ)'\"}' >> ~/.claude/adhd-runs.jsonl"
 ---
 
 # Tiki-Taka Deep Research Protocol (3 Rounds)
@@ -90,9 +106,14 @@ Round 3 (Claude synthesis → Codex verdict)
 
 **RULE**: Every arrow (↓) is a research gate. No round proceeds without fresh investigation.
 
+## Incomplete Phase Convention
+
+If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
+
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY)
+> **Exit contract**: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated. INCOMPLETE if timeout.
 
 **RULE: No Codex MCP call is permitted until Phase 0 is complete.**
 
@@ -129,6 +150,7 @@ Round 3 (Claude synthesis → Codex verdict)
    ```
 
 ### Phase 0.5 — Codex State-of-the-Art Probe
+> **Exit contract**: Codex web research on 4 dimensions returned. Fallback: Claude web search if MCP fails.
 
 Before the debate begins, ask Codex to web-research whether better approaches exist.
 
@@ -169,6 +191,7 @@ Before the debate begins, ask Codex to web-research whether better approaches ex
 **Integrate** Codex's web findings into your Evidence Base before proceeding to Round 1.
 
 ### Round 1 — Opening
+> **Exit contract**: Claude proposal + Codex critique + component ledger. INCOMPLETE if MCP fails.
 
 1. **Claude** conducts a 90-second **Pre-Proposal Investigation** triggered by Phase 0.5 findings, then presents a bold proposal.
 
@@ -227,6 +250,7 @@ Before the debate begins, ask Codex to web-research whether better approaches ex
 3. **Present** Codex's response to the user
 
 ### Phase 1.5 — Expanded Investigation (CRITICAL — this is what makes /tktk different)
+> **Exit contract**: Expanded investigation beyond R1 claims, new evidence discovered. INCOMPLETE if >3min.
 
 After Codex R1, do NOT just verify claims. **EXPAND your investigation** based on everything Codex raised.
 
@@ -257,6 +281,7 @@ After Codex R1, do NOT just verify claims. **EXPAND your investigation** based o
 4. Compile results as Phase 1.5 Evidence Update
 
 ### Round 2 — Deepening
+> **Exit contract**: Claude defense with Phase 1.5 evidence + Codex re-critique. INCOMPLETE if MCP fails.
 
 1. **Claude** conducts a 60-second **Pre-Defense Investigation**, then responds with FULL Phase 1.5 findings.
 
@@ -304,6 +329,7 @@ After Codex R1, do NOT just verify claims. **EXPAND your investigation** based o
 3. **Present** Codex's re-critique to the user
 
 ### Phase 2.5 — Pre-Synthesis Research (tktk exclusive)
+> **Exit contract**: Open questions resolved, integration verified. INCOMPLETE if >60s.
 
 **60-second surgical investigation** before final synthesis:
 
@@ -318,6 +344,7 @@ Time cap: 60 seconds. Launch 1-2 Explore agents if needed.
 **Compile Phase 2.5 Evidence** — this becomes the final evidence base for Round 3
 
 ### Round 3 — Convergence
+> **Exit contract**: Scope Preservation Report + Codex verdict + witness block. INCOMPLETE if MCP fails.
 
 1. **Claude** conducts a 60-second **Pre-Synthesis Surgical Check**, then synthesizes:
 
@@ -415,7 +442,6 @@ Time cap: 60 seconds. Launch 1-2 Explore agents if needed.
 - **Malformed response**: Ignore that round, continue
 - **Session limit**: Max 2 debates per conversation (deeper than /tk, uses more context)
 - **Phase timeout**: If Explore agents >2 min, output `⚠ PHASE [X] INCOMPLETE — [N findings gathered, M agents timed out]` and proceed.
-- **Incomplete Phase Marking**: If ANY phase could not be fully completed (timeout, MCP failure, missing data), output `⚠ PHASE [X] INCOMPLETE — [reason]` inline. This marker is visible to the user and enables post-hoc quality assessment.
 
 ## Output Format
 
@@ -448,6 +474,9 @@ Time cap: 60 seconds. Launch 1-2 Explore agents if needed.
 
 ### Decision
 {final decision with reasoning}
+
+### Witness Block (MUST — append at end of debate output)
+{"witness":{"skill":"tktk","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}
 ```
 
 ## Arguments
