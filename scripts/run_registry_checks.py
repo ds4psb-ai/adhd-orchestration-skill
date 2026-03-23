@@ -121,7 +121,17 @@ def select_checks(
     return selected
 
 
-def execute_check(row: RegistryRow, shell: str = "/bin/zsh") -> dict:
+def _default_shell() -> str:
+    import shutil
+    for sh in ("/bin/zsh", "/bin/bash", "/bin/sh"):
+        if shutil.which(sh) or Path(sh).exists():
+            return sh
+    return "/bin/sh"
+
+
+def execute_check(row: RegistryRow, shell: str | None = None) -> dict:
+    if shell is None:
+        shell = _default_shell()
     command = row.verification_command.strip()
     if command.lower() == "manual verification required":
         return {
