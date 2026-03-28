@@ -131,7 +131,29 @@ If ANY phase could not be fully completed (timeout, MCP failure, missing data), 
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY, before any Codex call)
-> Follow **CLAUDE.md § Pre-Debate Evidence Protocol**.
+> Exit contract: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated.
+
+**Steps:**
+1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings
+   (cite file:line, commit hash, or data point).
+   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths
+   - Agent 2: **Upstream investigation** — trace ROOT of pipeline/system
+   - Agent 3: **Historical investigation** — git log/blame (skip only if zero git history)
+
+2. **Root Cause Probe** — "Is the proposed change more likely to introduce negatives
+   than positives? What happens if we trace the problem to its true origin?"
+
+3. **Web Search Gate** — Execute if ANY condition met:
+   - Library/framework latest version features involved
+   - APIs/policies that may have changed after 2025-05
+   - Recency keywords ("latest", "2026", "current")
+   - Technical architecture or system design decision
+   - Keep searches concise: 1-3 queries, cite in debate
+
+4. **Compile Evidence Base**:
+   - Data examined, Key metrics, Root cause trace
+   - Git history pattern, Web search findings
+   - Gaps remaining, Confidence (HIGH/MED/LOW per finding)
 
 **TK-specific:**
 - **FORBIDDEN:** Calling `mcp__codex-cli__codex` without a completed Evidence Base.
@@ -397,7 +419,14 @@ Same prompt structure as R2 verdict, with additional:
 ```
 
 ## Anti-Deflation Guards
-> Obligations 1-6: Follow **CLAUDE.md § Debate Integrity Obligations**.
+
+### Debate Integrity Obligations
+1. **Default is KEEP, not CUT.** Burden of proof is on cutting.
+2. **Defend your position.** Fight with specific technical evidence.
+3. **Category B/C cuts REJECTED by default.** Only Category A (concrete flaw with proof) changes design.
+4. **Phase ≠ Cut.** Phasing preserves the destination. Hidden cuts → reject.
+5. **Final synthesis ≥ initial proposal ambition.** If less, explain with Category A evidence.
+6. **Research-first.** Every claim backed by Phase 0 evidence.
 
 ### Obligation 7 (TK default mode)
 7. **One-Shot Defense.** Round 2 is your ONLY defense. No holding back for a non-existent Round 3. Maximum intensity.
@@ -407,7 +436,12 @@ Same prompt structure as R2 verdict, with additional:
    Each research gate exists because debate cannot converge without fresh evidence.
 
 ### Red Flags
-> Core red flags: Follow **CLAUDE.md § Core Red Flags**.
+
+**Core red flags (all debate skills):**
+- Scope <70% of initial proposal → Likely capitulating. Restore B/C cuts.
+- All challenger points accepted → Stopped thinking critically.
+- Zero components STRENGTHENED → Debate only subtracted (deflation).
+- Phase 0 skipped or shallow → Debate built on sand.
 
 **TK-specific:**
 - Codex won R1 → Likely about to capitulate. Re-examine before defending.

@@ -94,14 +94,40 @@ If ANY phase could not be fully completed (timeout, tool failure, missing data),
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY)
-> Follow **CLAUDE.md § Pre-Debate Evidence Protocol**.
+> Exit contract: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated.
+
+**Steps:**
+1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings
+   (cite file:line, commit hash, or data point).
+   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths
+   - Agent 2: **Upstream investigation** — trace ROOT of pipeline/system
+   - Agent 3: **Historical investigation** — git log/blame (skip only if zero git history)
+
+2. **Root Cause Probe** — "Is the proposed change more likely to introduce negatives
+   than positives? What happens if we trace the problem to its true origin?"
+
+3. **Web Search Gate** — Execute if ANY condition met:
+   - Library/framework latest version features involved
+   - APIs/policies that may have changed after 2025-05
+   - Recency keywords ("latest", "2026", "current")
+   - Technical architecture or system design decision
+   - Keep searches concise: 1-3 queries, cite in debate
+
+4. **Compile Evidence Base**:
+   - Data examined, Key metrics, Root cause trace
+   - Git history pattern, Web search findings
+   - Gaps remaining, Confidence (HIGH/MED/LOW per finding)
 
 **TKC-specific additions to Web Search Gate:**
 - "Internal code patterns that may have industry-standard alternatives or known anti-patterns"
 - "A design decision of any kind is being made (naming, structure, flow, error handling)"
 
 ### Phase 0.5 — SoTA Self-Research (replaces Codex probe)
-> Follow **CLAUDE.md § SoTA Research Protocol** using WebSearch/tavily (no Codex MCP).
+> After Phase 0, research state-of-the-art across 4 dimensions using WebSearch/tavily (no Codex MCP):
+> 1. **SoTA alternatives** — better approaches (2025-2026), anti-patterns, production solutions
+> 2. **Recency check** — deprecated APIs, breaking changes, new best practices
+> 3. **Production evidence** — theoretical vs proven at scale
+> 4. **Cutoff awareness** — flag anything outdated (Claude cutoff 2025-05)
 
 **TKC-specific: Mandatory Execution Enforcement (MUST)**
 
@@ -357,14 +383,26 @@ Present the final synthesized position. Since there is no external verdict:
 - If bias audit raised red flags, acknowledge limitations of single-model debate
 
 ## Anti-Deflation Guards
-> Obligations 1-6: Follow **CLAUDE.md § Debate Integrity Obligations**.
+
+### Debate Integrity Obligations
+1. **Default is KEEP, not CUT.** Burden of proof is on cutting.
+2. **Defend your position.** Fight with specific technical evidence.
+3. **Category B/C cuts REJECTED by default.** Only Category A (concrete flaw with proof) changes design.
+4. **Phase ≠ Cut.** Phasing preserves the destination. Hidden cuts → reject.
+5. **Final synthesis ≥ initial proposal ambition.** If less, explain with Category A evidence.
+6. **Research-first.** Every claim backed by Phase 0 evidence.
 
 ### Obligation 7 (TKC-specific)
 7. **Commitment markers are binding.** Abandoning a Phase 1 "I COMMIT" claim without
    Category A evidence is a bias signal detected in Phase 3C audit.
 
 ### Red Flags
-> Core red flags: Follow **CLAUDE.md § Core Red Flags**.
+
+**Core red flags (all debate skills):**
+- Scope <70% of initial proposal → Likely capitulating. Restore B/C cuts.
+- All challenger points accepted → Stopped thinking critically.
+- Zero components STRENGTHENED → Debate only subtracted (deflation).
+- Phase 0 skipped or shallow → Debate built on sand.
 
 **TKC-specific:**
 - Anchoring ratio >40% → Defending by inertia, not evidence. Revisit rejections.
