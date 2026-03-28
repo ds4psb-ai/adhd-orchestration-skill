@@ -1,6 +1,6 @@
 ---
 name: tk
-description: "Tiki-Taka v2: 2-round Claude↔Codex debate with SoTA probe, root cause tracing, and Position Lock. Use when user says /tk, tiki-taka, debate, or asks for Codex opinion."
+description: "Tiki-Taka v2: 2-round Claude↔Codex debate (default) or 3-round deep research (--deep). SoTA probe, root cause tracing, Position Lock. Absorbs /tktk."
 hooks:
   Stop:
     - matcher: ""
@@ -19,17 +19,19 @@ hooks:
           command: "echo '{\"event\":\"stop_failure\",\"skill\":\"tk\",\"ts\":\"'$(date -u +%FT%TZ)'\"}' >> ~/.claude/adhd-runs.jsonl"
 ---
 
-# Tiki-Taka Debate v2 (2 Rounds) — Research-First Protocol
+# Tiki-Taka Debate v2 — Research-First Cross-Model Protocol
 
-Run a structured 2-round debate between Claude (lead) and Codex (challenger) using the Codex CLI MCP. **Every debate MUST begin with deep research.** No debate should start from surface-level analysis.
+Run a structured Claude↔Codex debate using the Codex CLI MCP. **Every debate MUST begin with deep research.** No debate should start from surface-level analysis.
 
-**Why 2 rounds > 3 rounds:** Each round is a capitulation surface. Benchmark data (4/4 debates: compound capitulation at R2→R3) proves R3 removal improves scope preservation. 2 rounds force "one-shot" intensity from both sides.
+**Default (2 rounds):** Each round is a capitulation surface. 2 rounds force "one-shot" intensity from both sides.
+**Deep mode (3 rounds):** For unknown root causes or SoTA comparison. Inter-round research at every junction. Merged from /tktk.
 
 ## Usage
 
 ```
-/tk <topic or question>
-/tk              # debates the current task/context
+/tk <topic>           # 2-round debate (default)
+/tk --deep <topic>    # 3-round deep research debate (absorbs /tktk)
+/tk                   # debates the current task/context
 ```
 
 ## Prerequisites
@@ -50,6 +52,14 @@ Phase 0   (Claude deep research: 2-3 Explore + root cause + git history + web se
 
 **MCP calls: 3** | **Debate rounds: 2** | **Research phases: 3** (0, 0.5, 1.5 MEGA)
 
+### Deep Mode Architecture (--deep)
+
+Phase 0 → Phase 0.5 → Round 1 → Phase 1.5 → Round 2 → Phase 2.5 → Round 3 FINAL
+
+**MCP calls: 4** | **Debate rounds: 3** | **Research phases: 4** (0, 0.5, 1.5, 2.5)
+
+**RULE: Every transition (↓) is a research gate. No round proceeds without fresh investigation.**
+
 ## Model Complementarity
 
 Both models can read code and search the web. The debate's value comes from exploiting their **asymmetric strengths**:
@@ -60,10 +70,27 @@ Both models can read code and search the web. The debate's value comes from expl
 | **Debate role** | Propose, defend, synthesize — grounded in multi-agent codebase evidence | Challenge, verify, broaden — grounded in web research + different training data |
 | **Unique value** | Can trace call paths, git-blame, and query schemas simultaneously | Catches blind spots from different training, stronger on novel patterns (SWE-Bench Pro 57.7%) |
 | **Blind spot** | Training cutoff 2025-05 — can miss recent changes in libs/APIs | Single-agent — can read files but can't orchestrate parallel deep dives |
+| **Harness role** | Generator + Reviewer (propose, defend) | Evaluator + Verifier (critique, web-check) |
 
 **Principle:** A turn where either model does NOT leverage its core edge is a wasted turn.
 - Claude turn without investigation (Explore agents, code traces, DB queries) = wasted
 - GPT turn without web verification (Tavily, Playwright, browsing) = wasted
+
+## Turn Rules (Codex Tiki-Taka Harness Pattern)
+
+> Source: Claude↔Codex session contract (2026-03)
+
+| Rule | TK Enforcement |
+|---|---|
+| Claude never says "looks good" without concrete check | Anti-Deflation Obligation 2 + Phase 1.5 MEGA verification |
+| Codex never says "done" without evidence | R1/R2 prompt requires web verification + code reads |
+| Any failed item becomes next highest priority | Category A acceptance → immediate defense integration |
+| Stop after PASS or budget cap | Session limit (3 default, 2 --deep) + MCP call budget |
+
+Session topology:
+- Claude = planner + reviewer (propose, investigate, defend, synthesize)
+- Codex = challenger + verifier (critique, web-verify, broaden, verdict)
+- Shared state = Evidence Base + thread context (NOT file system)
 
 ## MCP Resilience
 
@@ -104,43 +131,11 @@ If ANY phase could not be fully completed (timeout, MCP failure, missing data), 
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY, before any Codex call)
-> **Exit contract**: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated. INCOMPLETE if timeout.
+> Follow **CLAUDE.md § Pre-Debate Evidence Protocol**.
 
-**RULE: No Codex MCP call is permitted until Phase 0 is complete.** Even for short questions, you MUST gather evidence first.
-
-**Steps:**
-
-1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
-   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths, check schemas.
-   - Agent 2: **Upstream investigation** — trace the ROOT of the pipeline/system. If the question is about X, investigate what FEEDS X and what X FEEDS INTO.
-   - Agent 3: **Historical investigation** — MUST run unless topic has zero git history (cite why if skipping). git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
-
-2. **Root Cause Probe** — Before forming your position, ask yourself:
-   > "Is the proposed change more likely to introduce negatives than positives? What happens if we trace the problem to its true origin instead of patching the symptom?"
-
-   This is NOT pessimism — it's the discipline that catches the 51st downstream patch before it's written.
-
-3. **Web Search Gate** — Execute web search if ANY of these conditions are met:
-   - The question involves a specific library/framework's **latest version** features.
-   - APIs, policies, or best practices that may have changed after 2025-05 (Claude's training cutoff) are relevant.
-   - The user explicitly uses recency keywords ("latest", "2026", "current", "recently", "new").
-   - A technical decision depends on information that could have changed post-cutoff.
-   - The question involves a **technical architecture or system design** decision.
-   - Keep searches concise: 1-3 queries, extract key facts only, cite in the debate.
-
-4. **Compile the Evidence Base**:
-   ```
-   ## Evidence Base
-   - **Data examined**: [Actual data — DB queries, code traces, API responses, file contents]
-   - **Key metrics**: [Quantifiable findings — counts, scores, distances, percentages]
-   - **Root cause trace**: [Upstream origin of the problem — not just the symptom]
-   - **Git history pattern**: [If applicable — repeated fixes, threshold churn, tuning spirals]
-   - **Web search findings**: [If applicable — recent info with sources]
-   - **Gaps remaining**: [What is still unknown]
-   - **Confidence**: HIGH/MED/LOW per finding
-   ```
-
-**FORBIDDEN:** Calling `mcp__codex-cli__codex` without a completed Evidence Base. If you catch yourself about to skip Phase 0, STOP and investigate first.
+**TK-specific:**
+- **FORBIDDEN:** Calling `mcp__codex-cli__codex` without a completed Evidence Base.
+  If you catch yourself about to skip Phase 0, STOP and investigate first.
 
 ### Phase 0.5 — Codex State-of-the-Art Probe
 > **Exit contract**: Codex web research on 4 dimensions returned. Fallback: Claude web search if MCP fails.
@@ -372,25 +367,57 @@ Your synthesis should be AT LEAST as ambitious as your original proposal, improv
 - **If AGREE**: Adopt the synthesized position. Summarize the agreed approach.
 - **If DISAGREE**: Claude makes the final call, explicitly stating where it overrides Codex and why.
 
-## Anti-Deflation Guards (MUST)
+### Phase 2.5 — Pre-Synthesis Research (--deep mode ONLY)
+> **Exit contract**: All unresolved R2 disputes verified. INCOMPLETE if >60sec.
 
-### Claude's Obligations
-1. **Default is KEEP, not CUT.** Burden of proof is on cutting, not on keeping.
-2. **Defend your position.** If you believe in your proposal, fight for it. "Codex made a good point" is NOT sufficient reason to cut scope — state the specific technical evidence.
-3. **Category B/C cuts are REJECTED by default.** Only Category A (concrete technical flaw with proof) changes the design.
-4. **Phase ≠ Cut.** Phasing preserves the destination. If Codex says "do this later" but the "later" never has a path, it's a hidden cut — reject it.
-5. **Ambition ratchet.** Your final synthesis should be at least as ambitious as your R1 proposal. If it's less ambitious, explain each reduction with Category A evidence.
-6. **Research-first.** Every claim must be backed by Phase 0 evidence. Unsupported claims are weak claims — do the work before the debate.
-7. **One-Shot Defense.** Round 2 is your ONLY defense opportunity. No holding back for a non-existent Round 3. Maximum intensity in Section A.
+Surgical 60-second investigation before final synthesis:
+1. **Unresolved disputes** — R1+R2에서 Claude↔Codex 결론이 다른 포인트 → 코드/데이터 최종 확인
+2. **Integration verification** — 양측 동의 컴포넌트 → 실제 호환성 검증
+3. **Edge case data** — 경계 조건 → 실제 데이터로 검증
+4. **Evidence freshness** — R2 Codex 새 웹 리서치 → 코드베이스와 교차 검증
 
-### Red Flags (self-check)
-- Codex won R1 → You are likely about to capitulate in your ONE defense. Re-examine before responding.
-- Scope <70% of R1 → You are likely capitulating. Restore Category B/C cuts.
-- All Codex points accepted as "heterogeneous insight" → You stopped thinking critically.
-- Zero components STRENGTHENED → The debate only subtracted, never added. That's deflation.
-- Phase 0 was skipped or shallow → The entire debate is built on sand. STOP and research.
-- **Position Lock violated** → Section B weakened position beyond what Section A established. Revert.
-- **Conservative Bias Autopsy >50% REFLEX** → Codex's critique was mostly bias, not insight. Weight accordingly.
+### Round 3 FINAL — Synthesis → Verdict (--deep mode ONLY)
+> **Exit contract**: Full synthesis + Codex final verdict with research value assessment.
+
+Claude synthesizes all 3 rounds + Phase 2.5 evidence.
+
+**Claude's synthesis** includes:
+- Category A/B/C filtering for BOTH R1 and R2
+- Position Lock (compare against R1 proposal, not R2)
+- Scope Preservation Report with additional field:
+  ```
+  Research value: Which phase (0/0.5/1.5/2.5) had highest-impact discoveries?
+  ```
+
+**Codex's final verdict** (via mcp__codex-cli__codex-reply — call #4):
+Same prompt structure as R2 verdict, with additional:
+```
+(7) RESEARCH VALUE: Which round's investigation changed your mind most?
+(8) 3-ROUND DELTA: What did R3 add that R2 wouldn't have caught?
+```
+
+## Anti-Deflation Guards
+> Obligations 1-6: Follow **CLAUDE.md § Debate Integrity Obligations**.
+
+### Obligation 7 (TK default mode)
+7. **One-Shot Defense.** Round 2 is your ONLY defense. No holding back for a non-existent Round 3. Maximum intensity.
+
+### Obligation 7 (TK --deep mode)
+7. **Inter-round research is MANDATORY.** Do NOT shortcut Phase 1.5 or Phase 2.5.
+   Each research gate exists because debate cannot converge without fresh evidence.
+
+### Red Flags
+> Core red flags: Follow **CLAUDE.md § Core Red Flags**.
+
+**TK-specific:**
+- Codex won R1 → Likely about to capitulate. Re-examine before defending.
+- Position Lock violated → Section B weakened beyond Section A. Revert.
+- Conservative Bias Autopsy >50% REFLEX → Codex critique was mostly bias, not insight.
+
+**--deep additional:**
+- Phase 1.5 or 2.5 skipped → Research gate violated. Debate quality compromised.
+- Web research findings ignored in synthesis → Wasted Codex's unique value.
+- Codex won R1 AND R2 → Extreme capitulation risk. Maximum defense in R3.
 
 ## Stability Guards
 
@@ -409,6 +436,9 @@ Your synthesis should be AT LEAST as ambitious as your original proposal, improv
 - **Session limit**: Max 3 debates per conversation (context management)
 - **Phase 0 timeout**: If Explore agents >2 min, output `⚠ PHASE 0 INCOMPLETE — [N findings gathered, M agents timed out]` and proceed.
 - **Phase 1.5 MEGA timeout**: Hard cap 3 minutes. If exceeded, output `⚠ PHASE 1.5 INCOMPLETE — [reason]` and proceed.
+- **--deep session limit**: Max 2 deep debates per conversation (vs 3 for default)
+- **--deep Phase 2.5 timeout**: Hard cap 60 seconds. If exceeded, output `⚠ PHASE 2.5 INCOMPLETE` and proceed.
+- **--deep MCP budget**: 4 calls total. If any fail, follow Phase-specific fallbacks + reduce round count.
 
 ## Output Format
 
@@ -440,6 +470,17 @@ Present each phase clearly:
 ### Decision
 {final decision with reasoning}
 
+For `--deep` mode, add after Phase 1.5:
+### Round 2 — Deepening
+**Claude**: {revised proposal with Phase 1.5 findings}
+**Codex**: {re-critique with web research update}
+
+### Phase 2.5 — Pre-Synthesis Research
+{Unresolved disputes + integration verification + edge cases}
+
+### Round 3 FINAL — Synthesis → Verdict
+{Same structure as Round 2 FINAL in default mode}
+
 ### Witness Block (MUST — append at end of debate output)
 {"witness":{"skill":"tk","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}
 ```
@@ -448,5 +489,3 @@ Present each phase clearly:
 
 If called with arguments, use them as the debate topic.
 If called without arguments, debate the current task, problem, or most recent discussion topic in context.
-
-<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

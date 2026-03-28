@@ -1,6 +1,6 @@
 ---
 name: tkm
-description: "Tiki-Taka Meta-prompt Factory (TKM) — Parallel Work Package Generator. Decomposes complex multi-subsystem problems into N self-contained, conflict-free work packages for parallel execution."
+description: "Tiki-Taka Meta-prompt Factory (TKM) — Planner role in harness architecture. Decomposes problems into N self-contained, conflict-free work packages with output contracts."
 hooks:
   SubagentStop:
     - matcher: "Explore"
@@ -16,9 +16,13 @@ hooks:
 
 # Tiki-Taka Meta-prompt Factory (TKM) — Parallel Work Package Generator
 
-Generate 1-N **self-contained meta-prompt documents** for parallel execution in separate terminal sessions. Each document is designed to be consumed by `/tk`, `/tkc`, or `/tktk` — never executed directly.
+Generate 1-N **self-contained meta-prompt documents** for parallel execution in separate terminal sessions. Each document is designed to be consumed by `/tk`, `/tkc`, or `/tk --deep` — never executed directly.
 
 **Core principle:** /tkm INVESTIGATES and PARTITIONS. It does NOT implement, fix, or execute. Output = documents + JSON contracts.
+
+**Harness role:** TKM is the **Planner** — it takes a short prompt (or ADHD DHR) and
+expands it into build-ready work packages. Adapted from Anthropic's planner pattern:
+"Be ambitious on product scope, but avoid over-specifying low-level implementation."
 
 **Why /tkm exists:** When a problem spans multiple subsystems, a single developer session becomes a bottleneck. /tkm decomposes the problem into N conflict-free work packages that N independent sessions can execute in parallel — with zero file conflicts and explicit API contracts between streams.
 
@@ -148,12 +152,12 @@ If any intersection is non-empty, reassign the conflicting file to ONE stream.
 
 For each document, recommend the execution method:
 
-| Condition | Recommended Method | Reason |
-|-----------|-------------------|--------|
-| ≤2 issues, ≤3 files, no architecture decisions | `/tkc` | Fast self-debate (~1-3 min) |
-| ≥3 issues OR architecture/design decisions | `/tk` | Cross-model diversity needed |
-| Unknown root cause + SoTA comparison needed | `/tktk` | Deep 3-round research |
-| Trivial/mechanical changes only | Direct execution (no debate) | Debate overhead not justified |
+| Condition | Recommended | Reason |
+|-----------|-------------|--------|
+| ≤2 issues, ≤3 files, no architecture decisions | `/tkc` | Fast (~1-3 min), Claude 단독 |
+| ≥3 issues OR architecture/design decisions | `/tk` | Cross-model diversity |
+| Unknown root cause + SoTA comparison needed | `/tk --deep` | 3-round deep research |
+| Trivial/mechanical changes only | Direct (no debate) | Overhead not justified |
 
 #### Step D: Skeleton Output
 
@@ -369,6 +373,38 @@ table.column — Type — written by this stream, read by Stream [N]
 - [ ] `pytest --testmon` passes (backend changes)
 - [ ] `bun run build` passes (frontend changes)
 - [ ] No files outside Target Files table were modified
+
+## Output Contract
+
+Before claiming stream completion, the executing session MUST produce:
+
+### Mandatory Artifacts
+1. **Evidence of work**: Changed files list + brief rationale per change
+2. **Test evidence**: `pytest --testmon -x -q` output (backend) or `bun run build` log (frontend)
+3. **Checkpoint**: `/checkpoint` with JSON sidecar (progress %, key_files, base_sha)
+4. **Cross-stream signals**: `notices.md` append if findings affect other streams
+
+### Completion Criteria (adapted from Anthropic generator output contract)
+| Check | Required | How to Verify |
+|---|---|---|
+| All acceptance criteria met | YES | Self-review against criteria list above |
+| Tests pass | YES | pytest/bun output in evidence |
+| No new gaps introduced | YES | Grep TODO/FIXME/NotImplementedError in owned files |
+| Cross-stream API contracts honored | YES | Import/export signatures match § API Contract |
+
+**"Done" without this evidence is not done.** (Harness Turn Rule)
+
+### QA Handoff (if iteration_budget > 1)
+If this stream has iteration_budget > 1, after completing all acceptance criteria,
+produce a self-QA section grading against:
+| Criterion | Score /10 | Notes |
+|---|---|---|
+| Completeness | | |
+| Correctness | | |
+| Integration | | |
+| Quality | | |
+
+If any score < 7: flag areas needing iteration before claiming READY_FOR_REVIEW.
 ```
 
 #### File Naming & Location
@@ -486,7 +522,9 @@ When `--json` flag is used OR when invoked via `--from-run`, TKM additionally wr
       "consumed_by": "s<M>"
     }
   ],
-  "method": "direct|tkc|tk|tktk",
+  "method": "direct|tkc|tk|tk-deep",
+  "iteration_budget": 1,
+  "output_contract": ["evidence", "test_output", "checkpoint", "notices_if_needed"],
   "acceptance_criteria": ["pytest passes", "no files outside owned list modified"],
   "verification_required": ["backend-pytest", "verify-vdg-schema"],
   "base_sha": "<git HEAD at partition time>",
@@ -503,5 +541,3 @@ If called without arguments, use the current session context (recent discussion,
 `--docs N` forces specific document count (overrides auto-detection).
 `--from-run <run-id>` loads existing DHR from ADHD run (skips Phase 1).
 `--json` writes stream contract JSON files alongside markdown documents.
-
-<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

@@ -1,6 +1,6 @@
 ---
 name: tkc
-description: "Tiki-Taka Claude Self-Debate: Context-isolated subagent debate with persona inversion and bias audit. Use when user says /tkc, self-debate, or when Codex MCP is unavailable but structured debate is needed."
+description: "Claude 단독 Generator↔Evaluator: context-isolated subagent evaluation with 6-layer debiasing. Anthropic harness pattern의 single-model 구현."
 hooks:
   Stop:
     - matcher: ""
@@ -55,6 +55,27 @@ Phase 0    (Claude: deep research — Explore agents + web search)
 
 **MCP calls: 0** | **Subagent calls: 1** | **Research phases: 3** (0, 0.5, 2.5)
 
+## Harness Role Mapping
+
+> Source: Anthropic "Harness Design for Long-Running Application Development" (2026-03-24)
+
+| Anthropic Harness | TKC Phase | Implementation |
+|---|---|---|
+| Planner | (upstream: /tkm or user) | Problem spec before debate |
+| Generator | Phase 1 — Bold Proposal | Claude produces solution with evidence |
+| Evaluator | Phase 2 — Blind Challenger | Subagent evaluates independently (clean context) |
+| Feedback loop | Phase 2.5 → Phase 3 | Verify claims → Defend or Revise |
+| Grading criteria | Phase 2 prompt + Phase 3C | Persona criteria + bias audit |
+| Context reset | Subagent spawn | Key innovation: physically separate context |
+
+Blog insight: "Tuning a standalone evaluator to be skeptical turns out to be far
+more tractable than making a generator critical of its own work."
+→ TKC implements this via context-isolated subagent with mandatory disagreement quota.
+
+Blog insight: "Out of the box, Claude is a poor QA agent. It took several rounds
+of tuning before the evaluator was grading in a way that I found reasonable."
+→ TKC mitigates this via Anti-Sycophancy Protocol + 6-layer debiasing stack.
+
 ## Debiasing Stack
 
 | Layer | Technique | Effect |
@@ -73,88 +94,34 @@ If ANY phase could not be fully completed (timeout, tool failure, missing data),
 ## Protocol
 
 ### Phase 0 — Evidence Collection (MANDATORY)
-> **Exit contract**: ≥2 agents launched, ≥3 findings each, Evidence Base 7 fields populated. INCOMPLETE if timeout.
+> Follow **CLAUDE.md § Pre-Debate Evidence Protocol**.
 
-**RULE: No proposal is permitted until Phase 0 is complete.** Even for short questions, gather evidence first.
-
-**Steps:**
-
-1. **Launch ≥2 Explore agents in parallel**, each MUST produce ≥3 concrete findings (cite file:line, commit hash, or data point).
-   - Agent 1: **Direct investigation** — read ≥2 relevant source files, trace call paths, check schemas.
-   - Agent 2: **Upstream investigation** — trace the ROOT of the pipeline/system. If the question is about X, investigate what FEEDS X and what X FEEDS INTO.
-   - Agent 3: **Historical investigation** — MUST run unless topic has zero git history (cite why if skipping). git log/blame for relevant files. Look for patterns: repeated fixes, threshold churn, tuning spirals.
-
-2. **Root Cause Probe** — Before forming your position, ask yourself:
-   > "Is the proposed change more likely to introduce negatives than positives? What happens if we trace the problem to its true origin instead of patching the symptom?"
-
-3. **Web Search Gate** — Execute web search if ANY of these conditions are met:
-   - The question involves a specific library/framework's **latest version** features.
-   - APIs, policies, or best practices that may have changed after 2025-05 (Claude's training cutoff) are relevant.
-   - The user explicitly uses recency keywords ("latest", "2026", "current", "recently", "new").
-   - A technical decision depends on information that could have changed post-cutoff.
-   - The question involves a **technical architecture or system design** decision.
-   - The question involves **internal code patterns** that may have industry-standard alternatives or known anti-patterns.
-   - A **design decision** of any kind is being made (naming, structure, flow, error handling).
-   - Keep searches concise: 1-3 queries, extract key facts only, cite in the debate.
-
-4. **Compile the Evidence Base**:
-   ```
-   ## Evidence Base
-   - **Data examined**: [Actual data — DB queries, code traces, API responses, file contents]
-   - **Key metrics**: [Quantifiable findings — counts, scores, distances, percentages]
-   - **Root cause trace**: [Upstream origin of the problem — not just the symptom]
-   - **Git history pattern**: [If applicable — repeated fixes, threshold churn, tuning spirals]
-   - **Web search findings**: [If applicable — recent info with sources]
-   - **Gaps remaining**: [What is still unknown]
-   - **Confidence**: HIGH/MED/LOW per finding
-   ```
+**TKC-specific additions to Web Search Gate:**
+- "Internal code patterns that may have industry-standard alternatives or known anti-patterns"
+- "A design decision of any kind is being made (naming, structure, flow, error handling)"
 
 ### Phase 0.5 — SoTA Self-Research (replaces Codex probe)
-> **Exit contract**: 4 research dimensions covered via WebSearch/tavily. INCOMPLETE if all searches fail.
+> Follow **CLAUDE.md § SoTA Research Protocol** using WebSearch/tavily (no Codex MCP).
 
-Claude performs its own state-of-the-art research using WebSearch + tavily.
+**TKC-specific: Mandatory Execution Enforcement (MUST)**
 
-**Research Dimensions** (same 4 as /tk Phase 0.5):
+Phase 0.5 is MANDATORY by default. Skip ONLY if ALL 5 conditions are met:
+1. Purely internal naming/formatting/style (no external pattern applies)
+2. No library, framework, protocol, or algorithm involved
+3. No architectural or design decision being made
+4. Zero interaction with external systems (APIs, DBs, queues, auth)
+5. Can articulate what searches you WOULD run and why each returns zero results
 
-1. **STATE-OF-THE-ART ALTERNATIVES** — Search for better approaches to this class of problem (2025-2026). Include anti-patterns, failure case studies, production solutions.
-2. **RECENCY CHECK** — What changed in the last 12 months? Deprecated APIs, breaking changes, new best practices.
-3. **PRODUCTION EVIDENCE** — Distinguish "theoretical advantage" from "proven at production scale."
-4. **CUTOFF AWARENESS** — Flag anything in own evidence that may be outdated (cutoff 2025-05).
-
-**Execution Rule: MUST EXECUTE (opt-out, not opt-in)**
-
-Phase 0.5 web research is MANDATORY by default. Skip ONLY if ALL of the following are true:
-1. The topic is purely about this project's internal naming/formatting/style (no external pattern applies)
-2. No library, framework, protocol, or algorithm is involved
-3. No architectural or design decision is being made
-4. The change has zero interaction with external systems (APIs, DBs, message queues, auth)
-5. You can articulate what specific searches you WOULD run and why each would return zero useful results
-
-If even ONE condition fails → MUST execute web research.
-
-**If skipping, you MUST state:**
-> Phase 0.5 SKIP JUSTIFICATION: [explain which searches you considered and why ALL 5 conditions are met]
-
-**Anti-Skip Rationalizations (these are NOT valid reasons to skip):**
+**Anti-Skip Rationalizations (NOT valid reasons to skip):**
 | Rationalization | Why it's wrong |
 |---|---|
 | "Internal codebase work" | Industry patterns/anti-patterns apply to ALL code |
-| "Hardening task" | Hardening practices evolve — check latest approaches |
+| "Hardening task" | Hardening practices evolve |
 | "Not a technology decision" | Architecture decisions need SoTA comparison |
 | "All evidence is internal" | Internal evidence needs external validation |
-| "Simple refactoring" | Refactoring patterns have well-documented pitfalls |
-| "Just fixing a bug" | Bug classes have known solutions — check if yours is optimal |
+| "Simple refactoring" | Refactoring patterns have documented pitfalls |
+| "Just fixing a bug" | Bug classes have known solutions |
 | "No external dependency" | Design patterns are external knowledge |
-
-**Process:**
-- Use WebSearch and/or tavily-search for verification
-- Include version numbers and dates
-- Integrate findings into Evidence Base before proceeding to Phase 1
-
-**For internal codebase tasks, search for:**
-- "[problem class] best practices 2025 2026" (e.g., "state machine hardening best practices")
-- "[pattern name] anti-patterns production" (e.g., "retry logic anti-patterns production")
-- "[technique] alternatives comparison" (e.g., "cosine similarity alternatives comparison")
 
 ### Phase 1 — Bold Proposal with Commitment Markers
 > **Exit contract**: Root-cause-backed proposal + ≥2 I COMMIT markers with confidence levels.
@@ -252,6 +219,19 @@ You MUST:
 (5) PRESERVE & STRENGTHEN: Make valuable parts MORE ambitious
 (6) BETTER EXECUTION: Architecture/phasing alternatives
 (7) WHAT'S MISSING: What should be ADDED?
+
+## GRADING CRITERIA (evaluate the proposal against these, from Anthropic evaluator pattern)
+Grade each 1-10 before writing your critique:
+
+| Criterion | Weight | Question |
+|---|---|---|
+| Root Cause Accuracy | 30% | Does proposal address actual cause, not symptoms? |
+| Implementation Feasibility | 25% | Can this work with existing code/infra? |
+| Blast Radius Control | 25% | What breaks if implementation is wrong? |
+| Value Ambition | 20% | Does this unlock real value beyond minimal fix? |
+
+Overall weighted score: __/10
+If < 6.0: flag "PROPOSAL NEEDS FUNDAMENTAL REVISION" at top of critique.
 
 ## MANDATORY INDEPENDENT RESEARCH
 You MUST do your own investigation (read code, search codebase) before critiquing.
@@ -376,26 +356,21 @@ Present the final synthesized position. Since there is no external verdict:
 - Flag any bias audit concerns
 - If bias audit raised red flags, acknowledge limitations of single-model debate
 
-## Anti-Deflation Guards (MUST)
+## Anti-Deflation Guards
+> Obligations 1-6: Follow **CLAUDE.md § Debate Integrity Obligations**.
 
-### Claude's Obligations
-1. **Default is KEEP, not CUT.** Burden of proof is on cutting, not on keeping.
-2. **Defend your position.** If you believe in your proposal, fight for it.
-3. **Category B/C cuts are REJECTED by default.** Only Category A changes the design.
-4. **Phase ≠ Cut.** Phasing preserves the destination. Hidden cuts → reject.
-5. **Ambition ratchet.** Final synthesis should be at least as ambitious as Phase 1. If less ambitious, explain each reduction with Category A evidence.
-6. **Research-first.** Every claim must be backed by Phase 0 evidence.
-7. **Commitment markers are binding.** Abandoning a commitment without Category A evidence is a bias signal.
+### Obligation 7 (TKC-specific)
+7. **Commitment markers are binding.** Abandoning a Phase 1 "I COMMIT" claim without
+   Category A evidence is a bias signal detected in Phase 3C audit.
 
-### Red Flags (self-check)
-- Scope <70% of Phase 1 → Likely capitulating. Restore B/C cuts.
-- All challenger points accepted → Stopped thinking critically.
-- Zero components STRENGTHENED → Debate only subtracted. That's deflation.
-- Phase 0 was skipped or shallow → Debate built on sand. STOP and research.
-- Position Lock violated → Section B weakened beyond Section A. Revert.
-- Anchoring ratio >40% → Defending by inertia, not evidence.
-- Echo ratio >50% → Challenger was too sympathetic (same-model weakness).
+### Red Flags
+> Core red flags: Follow **CLAUDE.md § Core Red Flags**.
+
+**TKC-specific:**
+- Anchoring ratio >40% → Defending by inertia, not evidence. Revisit rejections.
+- Echo ratio >50% → Challenger too sympathetic (same-model weakness). Flag to user.
 - No novel insights → Debate didn't produce value. Acknowledge.
+- Challenger disagreement score <5/10 → Critique too weak. Note in Phase 3C.
 
 ## Stability Guards
 
@@ -445,5 +420,3 @@ Present each phase clearly:
 
 If called with arguments, use them as the debate topic.
 If called without arguments, debate the current task, problem, or most recent discussion topic in context.
-
-<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->

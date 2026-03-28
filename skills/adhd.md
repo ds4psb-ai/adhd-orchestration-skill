@@ -13,19 +13,66 @@ Mothership orchestrator that deeply diagnoses domain health, traces all dependen
 
 **MCP calls: 0** | **Subagent calls: 3-5** (Phase A+A.5) | **Output: DHR + /tkm work packages + terminal dispatch instructions**
 
+## Harness Design Principles
+
+> Source: Anthropic Engineering, "Harness Design for Long-Running Application Development" (2026-03-24)
+> These principles govern ADHD's design decisions and Tier routing.
+
+### P1: Component Justification
+"Every component in a harness encodes an assumption about what the model can't do on
+its own, and those assumptions are worth stress testing, both because they may be
+incorrect, and because they can quickly go stale as models improve."
+→ Each Tier level encodes an assumption about model capability. Re-evaluate after model upgrades.
+
+### P2: Simplicity First
+"Find the simplest solution possible, and only increase complexity when needed."
+→ Tier 0→1→2→3 already follows this. Never escalate Tier without evidence of necessity.
+
+### P3: Evaluation Separation
+"Separating the agent doing the work from the agent judging it proves to be a strong
+lever. Tuning a standalone evaluator to be skeptical turns out to be far more tractable
+than making a generator critical of its own work."
+→ Phase C (dispatch = work) ↔ Phase D (converge = evaluation). Never self-evaluate.
+  "Out of the box, Claude is a poor QA agent" — Phase D must be skeptical by design.
+
+### P4: Grading Over Binary
+"'Is this design beautiful?' is hard to answer consistently, but 'does this follow our
+principles for good design?' gives something concrete to grade against."
+→ Phase D uses criteria-based grading, not pass/fail. See Graded Verdict below.
+
+### P5: Harness Evolution
+"The space of interesting harness combinations doesn't shrink as models improve.
+Instead, it moves, and the interesting work for AI engineers is to keep finding
+the next novel combination."
+→ On model upgrade: review which Tier boundaries and guard sections are still load-bearing.
+  Opus 4.6 dropped sprint decomposition. What can we drop next?
+
+### P6: Context Management
+"A reset provides a clean slate, at the cost of the handoff artifact having enough state
+for the next agent to pick up the work cleanly."
+→ TKM terminal packets = structured handoff (stream JSON + work package md).
+  Opus 4.5+: automatic compaction handles most context growth. Reset only when needed.
+
+### P7: Iteration Loop
+"I ran 5 to 15 iterations per generation, with each iteration typically pushing the
+generator in a more distinctive direction. I also instructed the generator to make a
+strategic decision after each evaluation: refine the current direction if scores were
+trending well, or pivot to an entirely different aesthetic if the approach wasn't working."
+→ Phase D → Phase C re-dispatch loop. Iteration budget in manifest.json.
+  Each cycle: score trend up → refine, score trend down → pivot (re-enter Phase B).
+
 ## Sovereignty
 
 ADHD is the **orchestration layer** — it depends on sovereign sub-skills but never replaces them:
 
-| Sub-Skill | Role | Independent? |
-|-----------|------|-------------|
-| `/tkm` | Decompose problems into parallel work packages | YES — standalone or ADHD-routed |
-| `/tkc` | Fast structured debate (single-model) | YES — standalone or ADHD-routed |
-| `/tk` | Cross-model debate (Claude↔Codex) | YES — standalone |
-| `/tktk` | Deep research debate (3-round) | YES — standalone |
-| `/checkpoint` | Session state persistence (markdown + JSON) | YES — standalone |
-| `/verify-implementation` | Verification mesh hub | YES — standalone |
-| `/verify-ui-consistency` | Visual/a11y/design verification | YES — standalone |
+| Sub-Skill | Harness Role | Independent? |
+|-----------|-------------|-------------|
+| `/tkm` | **Planner** — decompose into work packages with output contracts | YES |
+| `/tkc` | **Claude Generator↔Evaluator** — single-model debate | YES |
+| `/tk` | **Cross-Model Generator↔Evaluator** — Claude↔Codex (includes --deep) | YES |
+| `/checkpoint` | **State Persistence** — session progress snapshots | YES |
+| `/verify-implementation` | **Verification Mesh** — test/schema/hardening gate | YES |
+| `/verify-ui-consistency` | **Visual Evaluator** — screenshot/a11y/design token check | YES |
 
 ## Usage
 
@@ -192,7 +239,7 @@ Tier 2: Multi-Session (DEFAULT — the common case)
   │   - /tkm --from-run <run-id>  (pass DHR context automatically)
   │   - Default method per package: /tkc (fast)
   │   - Upgrade to /tk if: SoTA needed, vendor/API decisions, cross-model value
-  │   - Upgrade to /tktk if: highest complexity, inter-round research essential
+  │   - Upgrade to /tk --deep if: unknown root cause, SoTA comparison needed
   ├── Downgrade to Tier 1 requires ALL FOUR conditions:
   │   □ Total gap count ≤ 2 (individual items, not categories)
   │   □ All gaps in single layer (not cross-layer per Phase A.5)
@@ -296,9 +343,31 @@ Each packet:
 ```markdown
 <domain> Stream K — <stream title>
 Work package: read <path to work package md> and begin.
-Method: /tkc (or /tk or /tktk)
+Method: /tkc (or /tk or /tk --deep)
 After completion: run /checkpoint.
 ```
+
+#### Step 2.5: Output Contract Reminder (NEW)
+
+Each terminal packet ends with:
+```
+Output contract (MUST complete before claiming done):
+1. Changed files list + rationale
+2. Test evidence (pytest/bun output)
+3. /checkpoint with JSON sidecar
+4. notices.md append if cross-stream findings
+"Done" without evidence = not done.
+```
+
+Add `iteration_budget` to manifest.json:
+```json
+{
+  "iteration_budget": 1,
+  ...
+}
+```
+
+Values: 1 (default), 3 (justified for complex multi-stream), 5 (user approval only).
 
 #### Step 3: Rule 11 Budget Check
 
@@ -383,18 +452,38 @@ Run Phase A again for the same domain. Compare against original DHR.
 |--------|--------------|---------|---------------------|--------|
 ```
 
-#### Step 4: Verdict
+#### Step 4: Graded Verdict (replaces binary pass/fail)
 
-```markdown
-### Verdict
-- Gaps closed: X/Y (Z%)
-- Remaining: list
-- New: list
-- Action: [COMPLETE ✅ | RE-ENTER Phase B | DEFER with justification]
-```
+> Adapted from Anthropic evaluator: "I wrote four grading criteria... each criterion
+> had a hard threshold, and if any one fell below it, the sprint failed."
 
-If gaps remain → re-enter Phase B with updated DHR (max 2 re-entries).
-After 2 re-entries: "Convergence requires manual judgment."
+Grade convergence against 4 criteria:
+
+| Criterion | Weight | Question | Grade /10 |
+|---|---|---|---|
+| Completeness | 30% | All gaps closed? Stubbed features? Output contracts honored? | |
+| Correctness | 25% | Implementation actually works? Tests pass? Evidence provided? | |
+| Integration | 25% | Cross-stream connections work? Import/export contracts match? | |
+| Quality | 20% | Production-ready? Hardening debt? Rule 14 compliance? | |
+
+**Thresholds:**
+- Weighted average ≥ 7.0 = **PASS** → COMPLETE
+- Any single criterion < 5.0 = **FAIL** regardless of average
+- Weighted average 5.0-6.9 = **CONDITIONAL** → iteration decision needed
+
+**Iteration Decision** (from P7 Iteration Loop):
+| Condition | Action |
+|---|---|
+| All ≥ 7.0 | COMPLETE |
+| 1-2 criteria < 7.0, scores trending up | REFINE (fix weak areas, same approach) |
+| 2+ criteria < 5.0 or scores trending down | PIVOT (re-enter Phase B with revised DHR) |
+| iteration_budget exhausted | "Convergence requires manual judgment" + full report |
+
+**Re-dispatch protocol:**
+When REFINE or PIVOT → decrement iteration_budget → re-enter Phase C with:
+- Updated DHR (Phase D re-scan results)
+- Specific QA feedback per failing criterion
+- "Fix failed areas first, then re-test" (generator rule from Anthropic harness)
 
 #### Step 5: Verify Mesh
 
@@ -527,5 +616,3 @@ For `/adhd verify`:
 ### Verification Mesh
 {verify-implementation + verify-ui-consistency results}
 ```
-
-<!-- Origin: https://github.com/ds4psb-ai/adhd-orchestration-skill | License: MIT + Attribution | (c) 2026 ds4psb-ai -->
