@@ -2,321 +2,250 @@
 
 [![ADHD Verify Pipeline](https://github.com/ds4psb-ai/adhd-orchestration-skill/actions/workflows/verify-pipeline.yml/badge.svg)](https://github.com/ds4psb-ai/adhd-orchestration-skill/actions/workflows/verify-pipeline.yml)
 
-> **Scatter-to-Converge**: A multi-terminal orchestration system designed for developers with ADHD who build excellent skeletons across parallel sessions but struggle with completion.
+> **"Separating the agent doing the work from the agent judging it proves to be a strong lever."**
+> — [Anthropic Engineering, Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
+
+A multi-terminal orchestration system that turns scattered parallel work into structured, convergent execution. The core idea: **the agent writing code never judges its own work.** A blind evaluator does. And it runs until the evaluator says PASS — then runs again, because single-pass verification misses ~30% of issues.
 
 **Author**: [ds4psb-ai](https://github.com/ds4psb-ai/)
 **License**: MIT + Attribution
 **Platform**: [Claude Code](https://claude.com/claude-code) (Anthropic CLI)
-**Models**: Claude Opus 4.6 (lead) + GPT-5.4 via Codex CLI (challenger, optional)
+**Models**: Claude Opus 4.6 (lead + evaluator) + GPT-5.4 via Codex CLI (challenger, optional)
 
 ## Quick Start
 
 ```bash
-# Install into any Claude Code project (run from repo root)
 bash <(curl -fsSL https://raw.githubusercontent.com/ds4psb-ai/adhd-orchestration-skill/main/install.sh)
 ```
 
-This installs all skills, hooks, scripts, and commands into your `.claude/` directory. See [Installation](#installation) for manual setup.
+## Philosophy
 
----
+This project implements the **Generator↔Evaluator harness pattern** from Anthropic's engineering research:
 
-## What This Is
+1. **Generator and Evaluator are separate agents.** The generator writes code. A blind evaluator — running Opus in a fresh context with zero knowledge of the generator's reasoning — judges it. This structural separation is the single biggest lever for quality.
 
-A 5-layer skill system for Claude Code that turns ADHD-style scattered parallel work into structured, convergent execution. The mothership (`/adhd`) never implements code itself — it **diagnoses** domain health, **traces** dependencies, **distributes** work across N terminal sessions, and **verifies** convergence.
+2. **Repetition breeds excellence.** Anthropic ran 5–15 iterations per generation, each pushing in a more distinctive direction. We adopt this: more eval rounds = higher quality output. Token cost is irrelevant. The harness runs until PASS, then runs again to catch what the first pass missed.
 
-### The Problem It Solves
+3. **Debate before implementation.** Every non-trivial change goes through structured debate (TKC or TK) before a single line of code is written. The debate produces a `handoff.json` contract that the execution harness consumes.
 
-High-intelligence ADHD developers build great foundations across 4+ parallel sessions, but:
-- Checkpoints stall at 40-80%
-- Hotfix chains emerge instead of completing features
-- Downstream integration gets missed
-- Phase 1 ships without Phase 2+
+4. **Scatter-to-Converge.** ADHD developers build excellent skeletons across parallel sessions but struggle with completion. This system automates the hard parts: deep diagnosis, conflict-free work distribution across N terminals, and git-based convergence verification.
 
-### The Solution
+## Architecture
 
 ```
-/adhd vdg embedding    →  Deep diagnosis → N conflict-free work packages → N terminals → git-based convergence
+         ┌─────────┐
+         │  /adhd   │  Mothership: diagnose → route → dispatch → converge
+         └────┬─────┘  Never implements. Only orchestrates.
+              │
+         ┌────▼─────┐
+         │  /tkm     │  Planner: decompose into N conflict-free work packages
+         └────┬─────┘  Zero file overlap. Explicit API contracts between streams.
+              │
+     ┌────────┼────────┐
+     ▼        ▼        ▼
+  ┌──────┐ ┌──────┐ ┌──────┐
+  │ /tkc │ │ /tk  │ │ /tk  │  Debate: structured reasoning before code
+  │      │ │      │ │--deep│  /tkc = self-debate, /tk = Claude↔Codex
+  └──┬───┘ └──┬───┘ └──┬───┘
+     │        │        │
+     ▼        ▼        ▼     handoff.json (debate conclusions → execution)
+  ┌──────────────────────┐
+  │       /ralph          │  Execution Harness: implement + blind-evaluator loop
+  │  Generator ↔ Evaluator│  Minimum 2 eval rounds. Evaluator runs Opus.
+  └──────────┬───────────┘
+             │
+         ┌───▼────┐
+         │ /adhd   │  Converge: PULL-based git scan + cross-stream eval
+         │ verify  │  Graded verdict (not binary). Iterate if needed.
+         └────────┘
 ```
 
-## Architecture — 5-Layer Stack
+### The Chain
+
+Every task follows one path:
 
 ```
-Layer 0: State Harness      — hooks + witness mesh + JSON state + SHA tracking + observability
-Layer 1: ADHD Router        — diagnose / route / dispatch / converge (thin, never implements)
-Layer 2: Reasoning Skills   — TKM / TKC / TK / TKTK (each sovereign, dual-mode)
-Layer 3: Persistence        — checkpoint + run manifest + stream state + convergence
-Layer 4: Verification Mesh  — verify-implementation (diff-aware registry) + domain verifiers
+/adhd diagnose → /tkm partition → /tkc|/tk debate → /ralph implement+eval → /adhd converge
 ```
 
-## Skill Inventory
+Each link produces a structured artifact consumed by the next:
+- **TKM** → work package markdown + stream JSON contracts
+- **TKC/TK** → `handoff.json` (debate conclusions, target files, acceptance criteria)
+- **Ralph** → `notices.md` (completion signals for ADHD convergence)
 
-| Skill | File | Role | Standalone? |
-|-------|------|------|-------------|
-| **ADHD** | `skills/adhd.md` | Mothership orchestrator: diagnose → route → dispatch → converge | YES |
-| **TKM** | `skills/tkm.md` | Decompose problems into N conflict-free parallel work packages | YES |
-| **TK** | `skills/tk.md` | 2-round Claude↔Codex debate with SoTA probe + Position Lock | YES (requires Codex MCP) |
-| **TKC** | `skills/tkc.md` | Context-isolated self-debate with persona inversion + bias audit | YES (no MCP needed) |
-| **TKTK** | `skills/tktk.md` | 3-round deep research debate with inter-round investigation | YES (requires Codex MCP) |
-| **Verify** | `skills/verify-implementation.md` | Diff-aware dynamic check registry with Before/After revalidation | YES |
-| **Checkpoint** | `commands/checkpoint.md` | Session state persistence with SHA-based staleness tracking | YES |
+## Skills
 
-### Sovereignty Protocol
+| Skill | What it does | Standalone? |
+|-------|-------------|-------------|
+| **`/adhd`** | Mothership: diagnose domain health, route to tiers, dispatch work, converge | Yes |
+| **`/tkm`** | Decompose problems into N conflict-free parallel work packages | Yes |
+| **`/tkc`** | Self-debate via context-isolated subagent with 6-layer debiasing | Yes |
+| **`/tk`** | Claude↔Codex cross-model debate (2 rounds, or 3 with `--deep`) | Yes (needs Codex MCP) |
+| **`/ralph`** | Execution harness: Generator + Blind Evaluator loop with persistent state | Yes |
+| **`/verify-implementation`** | Diff-aware dynamic check registry | Yes |
+| **`/checkpoint`** | Session state persistence with SHA-based staleness | Yes |
 
-Every sub-skill passes the Sovereignty Test:
-1. **Callable without ADHD context** — standalone invocation produces useful output
-2. **Produces useful artifact alone** — not just intermediate state
-3. **Explicit I/O contract** — documented input/output
-4. **Dual-mode entry** — standalone OR ADHD-routed (via `--from-run`)
+Every skill passes the **Sovereignty Test**: callable without ADHD context, produces useful output alone, documented I/O contract, dual-mode entry (standalone or ADHD-routed).
 
-## How It Works
+## Key Concepts
 
-### ADHD Protocol (4 Phases)
+### Blind Evaluators (Opus)
 
+The evaluator agents run **Claude Opus** in a fresh context. They have:
+- Zero knowledge of the generator's reasoning chain
+- Read-only access to code + test commands
+- A skepticism mandate: "if you find zero issues, double-check"
+- Strict output contract: PASS with evidence, or FAIL with file:line gaps
+
+Three evaluator variants:
+- `blind-evaluator` — full-stack fallback
+- `blind-evaluator-be` — backend only (Python, pytest, schema)
+- `blind-evaluator-fe` — frontend only (TypeScript, build, i18n)
+
+### handoff.json — Debate-to-Execution Contract
+
+When a debate skill (`/tkc` or `/tk`) concludes that implementation is needed, it writes a structured handoff:
+
+```json
+{
+  "from_skill": "tkc",
+  "debate_topic": "Redis vs in-memory LRU for session caching",
+  "final_decision": "Use Redis with 5min TTL — in-memory LRU breaks under horizontal scaling",
+  "target_files": ["backend/services/cache.py", "backend/config.py"],
+  "acceptance_criteria": ["pytest passes", "cache hit rate ≥80% in load test"],
+  "evidence_summary": "Phase 0 found 3 endpoints doing redundant DB queries...",
+  "iteration_hint": "normal"
+}
 ```
-Phase A    (RECON: 3 parallel Explore agents scan git + checkpoints + code gaps)
-  → Phase A.5  (DEPENDENCY DEEP-DIVE: trace upstream/downstream/cross-layer per gap)
-    → Phase B    (ROUTE: Tier 2-biased — default is multi-terminal distribution)
-      → Phase C    (DISPATCH: /tkm → N work packages → N terminal context packets)
-        → Phase D    (CONVERGE: PULL-based git scan + verify mesh)
-```
+
+Ralph reads this on startup, pre-populates its investigation hints, then deletes it (one-shot handoff). **Ralph still runs its own full investigation** — the handoff accelerates, it doesn't bypass.
 
 ### 4-Tier Routing
 
 | Tier | When | Action |
 |------|------|--------|
-| **Tier 0: Direct** | 1 gap, 1 file, mechanical | Direct fix (rare) |
-| **Tier 1: Solo** | 1-2 gaps, single layer | `/tkc` or `/tk` |
-| **Tier 2: Multi** (DEFAULT) | 2+ gaps | `/tkm` → N terminals |
-| **Tier 3: Team** | Production incident, 10+ gaps | Agent Teams |
+| **0: Direct** | 1 gap, 1 file, mechanical | Just fix it (rare) |
+| **1: Solo** | 1-2 gaps, single layer | `/tkc` or `/tk` → `/ralph` |
+| **2: Multi** (default) | 2+ gaps | `/tkm` → N terminals |
+| **3: Team** | Production incident | Agent Teams |
 
-### Debate Skills Comparison
+**Tier 2 is the default.** ADHD exists to distribute work. Single-terminal is the exception.
 
-| Skill | Model(s) | Rounds | Time | Best For |
-|-------|----------|--------|------|----------|
-| `/tkc` | Claude only (self-debate) | 1 subagent | ~1-3 min | Fast structured debate, MCP unavailable |
-| `/tk` | Claude + Codex | 2 rounds | ~10-18 min | Cross-model diversity, SoTA decisions |
-| `/tktk` | Claude + Codex | 3 rounds | ~20-30 min | Deep root-cause, inter-round research |
+### Anti-Deflation
 
-### Dual-LLM Architecture (Tiki-Taka)
+Debate skills enforce aggressive scope preservation:
+- **Category A** (accept): concrete flaw with proof
+- **Category B** (reject by default): scope reduction as pragmatism
+- **Category C** (reject): generic risk aversion
+- **Position Lock**: prevents retroactive weakening between defense and synthesis
+- **≥70% scope preservation** or explain with Category A evidence
 
-The debate skills exploit **cognitive diversity** from different model training:
+### Witness Mesh
 
-| | Claude Opus 4.6 (Lead) | GPT-5.4 via Codex CLI (Challenger) |
-|---|---|---|
-| **Edge** | Orchestrated deep investigation — parallel agents, code tracing | Fresh perspective + web verification (BrowseComp 82.7%) |
-| **Role** | Propose, defend, synthesize | Challenge, verify, broaden |
-| **Blind spot** | Training cutoff | Single-agent, no parallel deep dives |
-
-A turn where either model doesn't leverage its core edge is a wasted turn.
-
-### Anti-Deflation System
-
-All debate skills enforce aggressive scope preservation:
-- **Category A** (Accept): Concrete technical flaw with proof
-- **Category B** (REJECT by default): Scope reduction framed as pragmatism
-- **Category C** (REJECT): Generic risk aversion
-- **Position Lock**: Checkpoint between defense and synthesis prevents retroactive weakening
-- **Scope Preservation Report**: Must maintain ≥70% of original proposal ambition
-
-### Witness Mesh (Anti-Laziness Enforcement)
-
-External hook-based validation that catches step-skipping before output reaches the user. Addresses the core problem: LLMs self-assessing compliance is like students grading their own exams.
-
-**How it works:**
+External hook-based validation. Addresses the core problem: LLMs grading their own work is like students grading their own exams.
 
 ```
-Debate skill runs → Claude produces output → Stop hook fires
-  → skill-witness.sh checks: Evidence Base? Component Ledger? Witness Block?
-    → Missing? → exit 2 (Claude forced to continue and add missing parts)
-    → All present? → exit 0 (output passes)
-
-Explore agent completes → SubagentStop hook fires
-  → explore-witness.sh checks: ≥3 concrete findings?
-    → <3 findings? → exit 2 (agent must expand investigation)
-    → ≥3 findings? → exit 0 (agent passes)
+Skill runs → output produced → Stop hook fires → witness script checks completeness
+  → Missing evidence? → exit 2 (forced to continue)
+  → All present? → exit 0 (passes)
 ```
-
-**Components:**
-
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `skill-witness.sh` | Stop hook | Validates debate output has Evidence Base, Component Ledger, Witness Block |
-| `explore-witness.sh` | SubagentStop hook | Validates Explore agents produce ≥3 concrete findings |
-| Frontmatter hooks | YAML in skill files | Scopes hooks to debate skill lifecycle (not global) |
-| StopFailure logging | JSONL append | Observability for API errors during skill execution |
-| Exit contracts | Blockquotes | Per-phase MUST requirements summarized at each Phase header |
-| Witness block | JSON template | Structured output format for machine-parseable completeness |
-
-**Witness block format** (appended at end of debate output):
-```json
-{"witness":{"skill":"tk","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}
-```
-
-**Design decisions:**
-- Skill-scoped frontmatter hooks (not project-global) — only fire during debate skill execution
-- `stop_hook_active` guard prevents infinite loops (hook re-triggering itself)
-- `scope_pct_informational` is advisory only — no hard gate without upfront component weights
 
 ## Installation
 
-### Prerequisites
-
-- [Claude Code](https://claude.com/claude-code) installed and configured
-- (Optional) [Codex CLI](https://github.com/openai/codex) for dual-model debates (`/tk`, `/tktk`)
-
-### Setup
-
-1. Copy skills to your Claude Code project:
+### One-liner
 
 ```bash
-# Create skill directories
-mkdir -p .claude/skills/{adhd,tkm,tk,tkc,tktk}
-mkdir -p .claude/{commands,hooks}
+bash <(curl -fsSL https://raw.githubusercontent.com/ds4psb-ai/adhd-orchestration-skill/main/install.sh)
+```
 
-# Copy skill files
+### Manual
+
+```bash
+# Skills
+mkdir -p .claude/skills/{adhd,tkm,tk,tkc,ralph}
+mkdir -p .claude/{commands,hooks,agents}
+
 cp skills/adhd.md   .claude/skills/adhd/SKILL.md
 cp skills/tkm.md    .claude/skills/tkm/SKILL.md
 cp skills/tk.md     .claude/skills/tk/SKILL.md
 cp skills/tkc.md    .claude/skills/tkc/SKILL.md
-cp skills/tktk.md   .claude/skills/tktk/SKILL.md
+cp skills/ralph.md  .claude/skills/ralph/SKILL.md
 cp skills/verify-implementation.md .claude/skills/verify-implementation/SKILL.md
 cp commands/checkpoint.md .claude/commands/checkpoint.md
 
-# Copy verification scripts
-mkdir -p .claude/skills/verify-implementation/scripts
-mkdir -p .claude/skills/manage-skills/scripts
-cp scripts/run_registry_checks.py .claude/skills/verify-implementation/scripts/
-cp scripts/skill_registry_sync.py .claude/skills/manage-skills/scripts/
+# Blind evaluator agents (Opus)
+cp agents/blind-evaluator.md    .claude/agents/blind-evaluator.md
+cp agents/blind-evaluator-be.md .claude/agents/blind-evaluator-be.md
+cp agents/blind-evaluator-fe.md .claude/agents/blind-evaluator-fe.md
 
-# Copy witness mesh hooks (optional but recommended)
+# Witness mesh hooks
 cp hooks/skill-witness.sh  .claude/hooks/skill-witness.sh
 cp hooks/explore-witness.sh .claude/hooks/explore-witness.sh
 chmod +x .claude/hooks/*.sh
 ```
 
-2. Register skills in your `CLAUDE.md` (or project instructions):
-
-```markdown
-## Available Skills
-- `/adhd` — Mothership orchestrator for multi-terminal work
-- `/tkm` — Parallel work package generator
-- `/tk` — Claude↔Codex 2-round debate
-- `/tkc` — Claude self-debate (no MCP needed)
-- `/tktk` — Deep 3-round research debate
-- `/verify-implementation` — Diff-aware verification with dynamic check registry
-- `/checkpoint` — Session state persistence
-```
-
-3. (Optional) Configure Codex CLI for dual-model debates:
+### Optional: Codex CLI for dual-model debates
 
 ```bash
-# Install Codex CLI
 npm install -g @openai/codex
-
 # Configure model in ~/.codex/config.toml
-# The skills will use whatever model is configured there
 ```
 
-## Usage Examples
+## Usage
 
 ```bash
-# Full domain health dashboard
-/adhd
+/adhd vdg embedding          # Diagnose + distribute work for a domain
+/adhd                         # Cross-domain health dashboard
+/adhd verify vdg              # Git-based convergence check
 
-# Diagnose + route for specific domain
-/adhd vdg embedding
+/tkm "Refactor auth middleware"  # Generate N parallel work packages
+/tkc "Redis vs in-memory LRU?"  # Fast self-debate (~1-3 min)
+/tk "Postgres → CockroachDB"    # Cross-model debate (~10-18 min)
+/ralph "Fix auth race condition" # Execute with blind-evaluator loop
 
-# Convergence verification (PULL-based git scan)
-/adhd verify vdg
-
-# Standalone work package generation
-/tkm "Refactor auth middleware for compliance"
-
-# Fast self-debate (no Codex needed)
-/tkc "Should we use Redis or in-memory LRU for caching?"
-
-# Cross-model debate
-/tk "Migration strategy for PostgreSQL → CockroachDB"
-
-# Deep research debate
-/tktk "Event sourcing vs CQRS for audit trail"
-
-# Diff-aware verification (runs only checks matching changed files)
-/verify-implementation
-
-# Save session state for cross-session continuity
-/checkpoint
+/verify-implementation           # Diff-aware verification
+/checkpoint                      # Save session state
 ```
-
-## ADHD-Specific Red Flags
-
-| Trap | Recognition | Correction |
-|------|-------------|------------|
-| "I'll do it all in one terminal" | 2+ gaps, not distributing | Tier 2 is DEFAULT → distribute |
-| "I'll merge it later" | No checkpoint at session end | `/checkpoint` is MANDATORY |
-| "Let me quickly fix this too" | Drifting to another domain | Stay on current domain |
-| "It'll probably be fine" | Skipping diagnosis | RECON is mandatory |
-| "This is just Tier 0" | Underestimating complexity | If uncertain → Tier 2 |
-| "That's only 1 gap" | Counting by category | Count INDIVIDUAL items |
-
-## Key Design Decisions
-
-1. **ADHD never implements** — It's a thin router. Implementation happens in sub-skills running in separate terminals.
-2. **Tier 2 is the default** — ADHD exists to distribute work. Single-terminal is the exception.
-3. **PULL-based convergence** — Doesn't rely on sessions self-reporting. Scans git state directly.
-4. **SHA-based staleness** — Checkpoints track git SHAs, not timestamps.
-5. **Sub-skill sovereignty** — Every skill works standalone OR ADHD-routed. No lock-in.
-6. **External validation over self-assessment** — Witness mesh hooks enforce output completeness externally, because LLM self-grading is unreliable (Anthropic auditing agents study: single investigator 13% → parallel auditors 42% → evaluation agent 88%).
 
 ## File Structure
 
 ```
 adhd-orchestration-skill/
-├── README.md                       # This file
 ├── skills/
-│   ├── adhd.md                    # Mothership orchestrator
-│   ├── tkm.md                     # Work package generator
-│   ├── tk.md                      # Claude↔Codex 2-round debate
-│   ├── tkc.md                     # Claude self-debate
-│   ├── tktk.md                    # Deep 3-round research debate
-│   └── verify-implementation.md   # Diff-aware verification mesh
-├── scripts/
-│   ├── run_registry_checks.py     # Execute registry checks + report
-│   └── skill_registry_sync.py     # Auto-extend registry from git diff
+│   ├── adhd.md              # Mothership orchestrator
+│   ├── tkm.md               # Work package generator
+│   ├── tk.md                # Claude↔Codex debate
+│   ├── tkc.md               # Claude self-debate
+│   ├── ralph.md             # Execution harness (Generator↔Evaluator)
+│   └── verify-implementation.md
+├── agents/
+│   ├── blind-evaluator.md   # Full-stack evaluator (Opus)
+│   ├── blind-evaluator-be.md # Backend evaluator (Opus)
+│   └── blind-evaluator-fe.md # Frontend evaluator (Opus)
 ├── hooks/
-│   ├── skill-witness.sh           # Stop hook: debate output completeness
-│   └── explore-witness.sh         # SubagentStop hook: ≥3 findings gate
+│   ├── skill-witness.sh     # Debate output completeness
+│   └── explore-witness.sh   # ≥3 findings gate
 ├── commands/
-│   └── checkpoint.md               # Session persistence
+│   └── checkpoint.md
+├── scripts/
+│   ├── run_registry_checks.py
+│   └── skill_registry_sync.py
 ├── examples/
-│   └── sample-monorepo/            # Demo: backend + frontend with verify registry
-├── .github/
-│   └── workflows/
-│       └── verify-pipeline.yml     # CI: registry sync → checks → JSONL report
-└── install.sh                       # One-liner installer
+│   └── sample-monorepo/
+├── .github/workflows/
+│   └── verify-pipeline.yml
+└── install.sh
 ```
 
-## CI Pipeline
+## Design Decisions
 
-The repo includes a GitHub Actions workflow that demonstrates the full `/adhd → /tkm → /verify-implementation` pipeline on every push:
-
-1. **Registry Sync** — `skill_registry_sync.py` detects changed files and auto-extends the check registry
-2. **Verification Run** — `run_registry_checks.py` executes all active checks against the sample monorepo
-3. **JSONL Report** — appends a structured summary to `adhd-runs.jsonl`
-4. **Install Test** — verifies `install.sh` works on a clean git repo
-
-Reports are uploaded as CI artifacts. Example JSONL output:
-
-```json
-{"event":"ci_verify","sha":"abc123","ref":"main","timestamp":"2026-03-23T12:00:00Z","changed_files":5,"executed_checks":5,"pass_count":4,"fail_count":0,"manual_count":1,"sync_matched":3,"sync_created":0}
-```
-
-### Sample Monorepo
-
-`examples/sample-monorepo/` contains a minimal backend + frontend project with:
-- **Intentional stubs** (`NotImplementedError` in `user_service.py`) — what `/adhd` Phase A would detect as gaps
-- **Pre-populated verify registry** — 5 checks (pytest, build, typecheck, stub-detector, gap-detector)
-- **Passing tests** — demonstrates the Before/After regression gate
+1. **Generator never judges its own work.** Blind evaluator with fresh context, Opus model, mandatory skepticism.
+2. **Minimum 2 eval rounds.** Single-pass misses ~30%. The second round catches what the first missed.
+3. **Debate produces artifacts, not just conclusions.** `handoff.json` carries structured evidence from debate into execution.
+4. **PULL-based convergence.** ADHD doesn't trust sessions to self-report. It scans git state directly.
+5. **Every skill is sovereign.** Works standalone or ADHD-routed. No vendor lock-in to the orchestrator.
+6. **External validation > self-assessment.** Witness mesh hooks enforce output completeness because LLM self-grading is unreliable.
+7. **All paths end at /ralph.** Even trivial changes get blind-evaluator verification. The harness is non-negotiable.
 
 ## Contributing
 
@@ -326,11 +255,7 @@ Issues and PRs welcome at [github.com/ds4psb-ai](https://github.com/ds4psb-ai/).
 
 MIT + Attribution — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-You are free to use, modify, and distribute this project. **Attribution is required:**
-
 > Built with [ADHD Orchestration Skill](https://github.com/ds4psb-ai/adhd-orchestration-skill) by ds4psb-ai
-
-This notice must be preserved in forks and derivative works.
 
 ---
 

@@ -154,10 +154,13 @@ For each document, recommend the execution method:
 
 | Condition | Recommended | Reason |
 |-----------|-------------|--------|
-| ≤2 issues, ≤3 files, no architecture decisions | `/tkc` | Fast (~1-3 min), Claude 단독 |
-| ≥3 issues OR architecture/design decisions | `/tk` | Cross-model diversity |
-| Unknown root cause + SoTA comparison needed | `/tk --deep` | 3-round deep research |
-| Trivial/mechanical changes only | Direct (no debate) | Overhead not justified |
+| ≤2 issues, ≤3 files, no architecture decisions | `/tkc` → `/ralph` | Debate then implement with eval loop |
+| ≥3 issues OR architecture/design decisions | `/tk` → `/ralph` | Cross-model debate then eval loop |
+| Unknown root cause + SoTA comparison needed | `/tk --deep` → `/ralph` | Deep research then eval loop |
+| Trivial/mechanical changes only | `/ralph` (direct) | Skip debate, harness eval still mandatory |
+
+**All paths end at /ralph.** Even trivial changes get blind-evaluator verification.
+Debate skills (/tkc, /tk) produce `handoff.json` → Ralph consumes it for Phase 0 acceleration.
 
 #### Step D: Skeleton Output
 
@@ -362,7 +365,36 @@ table.column — Type — written by this stream, read by Stream [N]
 [Context]: [1-2 sentences of essential background].
 ```
 
-**Copy the above block into a fresh terminal session.**
+**After debate completes → `/ralph` for implementation with blind-evaluator loop.**
+
+```
+Execution chain: [Method] → /ralph
+Method: [Method] → /ralph (debate first, then execute with blind-evaluator loop)
+Ralph's blind-evaluator loop (min 2 rounds) is NON-NEGOTIABLE.
+Do NOT claim stream complete without Ralph PASS x2.
+```
+
+**Copy the above blocks into a fresh terminal session.**
+
+---
+
+## Ralph Handoff Hints
+
+> These hints accelerate /ralph Phase 0 — they do NOT replace it.
+> Ralph MUST still run its own Phase 0B-0F (symbol trace, dependency trace, patch plan).
+
+### Target Symbols (draft from TKM investigation)
+| Symbol | Sites (est.) | Role |
+|--------|-------------|------|
+| [from issue analysis] | [estimated grep count] | [producer/consumer] |
+
+### Upstream/Downstream Sketch
+- Upstream: [what feeds this code]
+- Downstream: [what consumes this code's output]
+
+### Verification Commands
+- Backend: `cd backend && source venv/bin/activate && pytest --testmon -x -q`
+- Frontend: `cd frontend && bun run build`
 
 ---
 

@@ -382,6 +382,32 @@ Present the final synthesized position. Since there is no external verdict:
 - Flag any bias audit concerns
 - If bias audit raised red flags, acknowledge limitations of single-model debate
 
+### Implementation Gate
+
+After the final decision, determine if implementation is needed:
+
+**Implementation Required?**
+- **YES** (code changes needed) → output Handoff Block below, then instruct: "다음 단계: `/ralph` 실행하여 구현 + blind-evaluator 검증."
+- **NO** (pure design/architecture decision, no code changes) → end debate normally
+
+**Handoff Block (only if implementation required):**
+
+Write the following JSON to `.claude/state/handoff.json` (overwrite if exists):
+```json
+{
+  "from_skill": "tkc",
+  "debate_topic": "[topic]",
+  "final_decision": "[1-2 sentence synthesis from Final Decision]",
+  "target_files": ["path/to/file1", "path/to/file2"],
+  "acceptance_criteria": ["criterion 1", "criterion 2"],
+  "evidence_summary": "[key findings from Phase 0 + Phase 2.5]",
+  "iteration_hint": "normal"
+}
+```
+
+**Standalone /tkc (no upstream /tkm or /adhd):** handoff.json is still written — Ralph consumes it if present.
+**No implementation needed:** skip handoff.json entirely. Debate ends at Final Decision.
+
 ## Anti-Deflation Guards
 
 ### Debate Integrity Obligations
@@ -449,6 +475,11 @@ Present each phase clearly:
 
 ### Decision
 {Final position + debate delta + bias audit summary}
+
+### Implementation Gate
+{Implementation required? YES/NO}
+{If YES: handoff.json written to .claude/state/handoff.json}
+{If YES: "다음 단계: /ralph 실행하여 구현 + blind-evaluator 검증."}
 
 ### Witness Block (MUST — append at end of debate output)
 {"witness":{"skill":"tkc","phase":"final","components":{"C1":"KEEP","C2":"STRENGTHEN"},"incomplete":[],"scope_pct_informational":85}}

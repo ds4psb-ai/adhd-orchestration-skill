@@ -5,9 +5,15 @@ description: "Mothership orchestrator: deep dependency diagnosis → Tier 2-bias
 
 # ADHD vNext — Mothership Orchestration Protocol
 
-Mothership orchestrator that deeply diagnoses domain health, traces all dependency chains, distributes work across multiple terminals via `/tkm`, and verifies convergence via PULL-based git scanning.
+Mothership orchestrator that deeply diagnoses domain health, traces all dependency chains, distributes work across multiple terminals via `/tkm`, and drives convergence through **adversarial Generator↔Evaluator harness loops**.
 
-**Core principle:** ADHD is the mothership — it diagnoses, routes, dispatches to multiple terminals, and converges. It NEVER implements code directly. **Default is multi-terminal distribution (Tier 2). Single-terminal execution requires explicit justification.**
+**Core principle:** ADHD is the mothership — it diagnoses, routes, dispatches, and **relentlessly evaluates**. Each stream runs `/tkc → /ralph` (debate → implement with blind-evaluator loop). ADHD Phase D then runs its own **cross-stream adversarial evaluation** — not passive git scanning, but active blind-evaluator spawning that pushes each iteration in a more distinctive direction.
+
+**Harness Philosophy (from Anthropic Engineering, 2026-03-24):**
+> "I ran 5 to 15 iterations per generation, with each iteration typically pushing
+> the generator in a more distinctive direction."
+
+Repetition is not overhead — it is the mechanism that produces excellence. Token cost is irrelevant. The harness runs until the evaluator says PASS, then runs again to find what the first pass missed. **Default is multi-terminal distribution (Tier 2). Single-terminal execution requires explicit justification.**
 
 **Why ADHD exists:** High-intelligence ADHD developers build excellent skeletons across 4+ parallel sessions, but the flesh never fills in. Checkpoints stall at 40-80%, hotfix chains emerge, and downstream integration gets missed. ADHD automates deep diagnosis, distributes work packages across N terminals via `/tkm`, and converges results.
 
@@ -92,12 +98,26 @@ ADHD is the **orchestration layer** — it depends on sovereign sub-skills but n
 
 ## Architecture
 
+> **The Anthropic Harness Principle (universal — applies to ALL tasks, not just UI):**
+> The adversarial Generator↔Evaluator loop is not domain-specific. It applies to:
+> - **Code**: Generator writes, Evaluator checks correctness + downstream impact
+> - **Architecture**: Generator proposes, Evaluator challenges feasibility + blast radius
+> - **Planning**: TKM generates work packages, Evaluator audits partitions + contracts
+> - **Investigation**: Explorer gathers evidence, Evaluator challenges completeness + bias
+> - **Convergence**: Streams produce, Cross-stream evaluator checks integration
+>
+> Every phase of ADHD that produces output gets an independent evaluation pass.
+> "I ran 5-15 iterations... each pushing in a more distinctive direction."
+
 ```
 Phase A    (RECON: git scan + checkpoint JSON + code gaps → Domain Health Report)
   → Phase A.5  (DEPENDENCY DEEP-DIVE: trace upstream/downstream/cross-layer for each gap)
     → Phase B    (ROUTE: Tier 2-biased adaptive routing — default is multi-terminal)
-      → Phase C    (DISPATCH: /tkm invocation + state harness + terminal packets)
-        → Phase D    (CONVERGE: PULL-based git scan + verify mesh — invoked separately)
+      → Phase C    (DISPATCH: /tkm → /tkc → /ralph chain per stream + terminal packets)
+        → Phase D    (CONVERGE: blind-evaluator adversarial loop + graded verdict — invoked separately)
+                     ↺ FAIL → re-dispatch (Phase C) with evaluator feedback
+                     ↺ PASS round 1 → mandatory round 2 (single-pass misses ~30%)
+                     ↺ PASS round 2 → COMPLETE
 ```
 
 ## Protocol
@@ -343,8 +363,12 @@ Each packet:
 ```markdown
 <domain> Stream K — <stream title>
 Work package: read <path to work package md> and begin.
-Method: /tkc (or /tk or /tk --deep)
+Method: /tkc → /ralph (debate first, then execute with blind-evaluator loop)
 After completion: run /checkpoint.
+
+MANDATORY CHAIN: /tkc (or /tk) for design decisions → /ralph for implementation.
+Ralph's blind-evaluator loop (min 2 rounds) is NON-NEGOTIABLE per stream.
+Do NOT claim stream complete without Ralph PASS x2.
 ```
 
 #### Step 2.5: Output Contract Reminder (NEW)
@@ -367,7 +391,12 @@ Add `iteration_budget` to manifest.json:
 }
 ```
 
-Values: 1 (default), 3 (justified for complex multi-stream), 5 (user approval only).
+Values: 3 (default — Ralph repetition is core philosophy), 5 (complex multi-stream), unlimited (user says "완벽하게" or "토큰 무제한").
+
+> **Core Philosophy: Repetition breeds excellence.**
+> Anthropic's harness ran 5-15 iterations per generation, producing "distinctive directions."
+> ADHD adopts this: more eval rounds = more diverse, higher-quality output.
+> Token cost is irrelevant — correctness and completeness are the only metrics.
 
 #### Step 3: Rule 11 Budget Check
 
@@ -452,7 +481,57 @@ Run Phase A again for the same domain. Compare against original DHR.
 |--------|--------------|---------|---------------------|--------|
 ```
 
-#### Step 4: Graded Verdict (replaces binary pass/fail)
+#### Step 4: Blind Evaluator Loop (Ralph-style — MANDATORY)
+
+> "Separating the agent doing the work from the agent judging it proves to be a strong lever."
+> "I ran 5-15 iterations per generation, each pushing in a more distinctive direction."
+> — Anthropic Engineering, 2026-03-24
+>
+> **Repetition breeds excellence.** Each evaluation round surfaces issues the prior round missed.
+> 10 rounds of eval produced "distinctive designs" — this is the core philosophy.
+
+**ADHD Phase D now runs Ralph's blind-evaluator loop at the convergence level.**
+This is NOT implementation-level eval (that's Ralph per-stream). This is **cross-stream integration eval**.
+
+**Step 4a: Spawn Cross-Stream Blind Evaluators (PARALLEL)**
+
+```
+Agent tool (spawn BOTH in one message):
+
+  subagent_type: blind-evaluator-be
+  prompt: "Cross-stream backend convergence eval for ADHD run <run-id>.
+           Read manifest at .claude/state/adhd/runs/<run-id>/manifest.json.
+           For EACH backend stream: grep target symbols, run pytest --testmon -x -q,
+           verify acceptance criteria from work package.
+           Check cross-stream API contracts: do imports match exports?
+           Return PASS or FAIL per stream + cross-stream integration verdict."
+
+  subagent_type: blind-evaluator-fe
+  prompt: "Cross-stream frontend convergence eval for ADHD run <run-id>.
+           Read manifest at .claude/state/adhd/runs/<run-id>/manifest.json.
+           For EACH frontend stream: grep target symbols, run bun run build,
+           check i18n keys in ko.json + en.json, verify acceptance criteria.
+           Check cross-stream component contracts: do shared types match?
+           Return PASS or FAIL per stream + cross-stream integration verdict."
+```
+
+**Step 4b: Eval Loop (MINIMUM 2 rounds, NO MAXIMUM)**
+
+```
+Round 1: Spawn evaluators → collect PASS/FAIL per stream
+  IF all PASS → Round 2 (mandatory — single-pass misses ~30%)
+  IF any FAIL → fix findings → re-verify → re-evaluate (new evaluator pair)
+
+Round 2: Spawn NEW evaluators (fresh context, no anchoring to Round 1)
+  IF all PASS → proceed to Step 4c (Graded Verdict)
+  IF any FAIL → fix → re-verify → Round 3
+
+Round 3+: Continue until ALL PASS or iteration_budget exhausted.
+  Each round: new evaluators, new context, new findings.
+  "10 rounds produced distinctive designs" — more rounds = higher quality.
+```
+
+**Step 4c: Graded Verdict (AFTER eval loop PASS)**
 
 > Adapted from Anthropic evaluator: "I wrote four grading criteria... each criterion
 > had a hard threshold, and if any one fell below it, the sprint failed."
@@ -471,10 +550,10 @@ Grade convergence against 4 criteria:
 - Any single criterion < 5.0 = **FAIL** regardless of average
 - Weighted average 5.0-6.9 = **CONDITIONAL** → iteration decision needed
 
-**Iteration Decision** (from P7 Iteration Loop):
+**Step 4d: Iteration Decision** (from P7 Iteration Loop):
 | Condition | Action |
 |---|---|
-| All ≥ 7.0 | COMPLETE |
+| All ≥ 7.0 AND eval loop PASS x2 | COMPLETE |
 | 1-2 criteria < 7.0, scores trending up | REFINE (fix weak areas, same approach) |
 | 2+ criteria < 5.0 or scores trending down | PIVOT (re-enter Phase B with revised DHR) |
 | iteration_budget exhausted | "Convergence requires manual judgment" + full report |
@@ -483,6 +562,7 @@ Grade convergence against 4 criteria:
 When REFINE or PIVOT → decrement iteration_budget → re-enter Phase C with:
 - Updated DHR (Phase D re-scan results)
 - Specific QA feedback per failing criterion
+- Blind evaluator findings from failed rounds
 - "Fix failed areas first, then re-test" (generator rule from Anthropic harness)
 
 #### Step 5: Verify Mesh
