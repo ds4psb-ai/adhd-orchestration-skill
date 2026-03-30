@@ -53,7 +53,7 @@ This project implements the **Generator↔Evaluator harness pattern** from Anthr
      ▼        ▼        ▼     handoff.json (debate conclusions → execution)
   ┌──────────────────────┐
   │       /ralph          │  Execution Harness: implement + blind-evaluator loop
-  │  Generator ↔ Evaluator│  Minimum 2 eval rounds. Evaluator runs Opus.
+  │  Generator ↔ Evaluator│  ≥2 eval rounds per stream. Evaluator runs Opus.
   └──────────┬───────────┘
              │
          ┌───▼────┐
