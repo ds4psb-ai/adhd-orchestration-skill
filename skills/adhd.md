@@ -114,11 +114,36 @@ Phase A    (RECON: git scan + checkpoint JSON + code gaps → Domain Health Repo
   → Phase A.5  (DEPENDENCY DEEP-DIVE: trace upstream/downstream/cross-layer for each gap)
     → Phase B    (ROUTE: Tier 2-biased adaptive routing — default is multi-terminal)
       → Phase C    (DISPATCH: /tkm → /tkc → /ralph chain per stream + terminal packets)
-        → Phase D    (CONVERGE: blind-evaluator adversarial loop + graded verdict — invoked separately)
+        → Phase D    (CONVERGE: git diff + checkpoint scan + evaluator + graded verdict)
                      ↺ FAIL → re-dispatch (Phase C) with evaluator feedback
-                     ↺ PASS round 1 → mandatory round 2 (single-pass misses ~30%)
-                     ↺ PASS round 2 → COMPLETE
+                     ✓ PASS → COMPLETE
 ```
+
+### Enforcement Architecture (P8)
+
+> Source: TKC debate 2026-03-30 — analysis of 31 ADHD runs showed 0% Phase D execution,
+> 60+ ad-hoc manifest fields, 5 phantom convergences. Root cause: spec existed but
+> enforcement was zero. These mechanisms make the spec executable.
+
+**Three enforcement layers:**
+
+1. **Phase Completion Gates** — Each phase MUST output a structured gate checklist before
+   the next phase can begin. Gates are structured templates (not prose MUSTs) that the
+   model fills in. Missing gate = invalid phase transition.
+
+2. **Manifest Schema Contract** — 10 required fields, fixed enum values. Ad-hoc fields
+   allowed in `extra` object only. `current_phase` + `phase_history[]` track transitions.
+
+3. **Observability Events** — JSONL events at each phase boundary. 7 event types enable
+   post-hoc analysis of routing accuracy, Phase D execution rate, and failure patterns.
+
+**Why enforcement works in prompts (vs. prose MUSTs):**
+Prose "MUST" scattered in paragraphs → ignored ~70% of the time (measured).
+Structured output templates with fill-in fields → followed reliably because the model
+treats them as output format instructions, not behavioral constraints.
+
+**Stream Status Enum (fixed):**
+`pending` | `active` | `complete` | `failed` — no other values permitted.
 
 ## Protocol
 
@@ -220,6 +245,21 @@ The Gap Matrix Count column MUST reflect individual item count.
 - Budget remaining: 1 more domain allowed
 ```
 
+**Phase A Gate (MUST output before proceeding to A.5):**
+```
+┌─ PHASE A GATE ─────────────────────────────────────┐
+│ Agents spawned: {N} (min 3)       ✅/❌             │
+│ Findings per agent: {a1:N, a2:N, a3:N} (min 3 each)│
+│ Gap count (individual items): {N}                   │
+│ DHR written to: {path}                              │
+│ JSONL event emitted: phase_end/A                    │
+│ Gate status: PASS / FAIL — {reason if fail}         │
+└─────────────────────────────────────────────────────┘
+```
+Emit JSONL: `{"event":"phase_end","run_id":"...","phase":"A","findings":{N},"gap_count":{N},"ts":"..."}`
+
+**Gate FAIL → STOP. Do not proceed to Phase A.5. Re-run agents or ask user for guidance.**
+
 ### Phase A.5 — DEPENDENCY DEEP-DIVE (MANDATORY)
 
 **After DHR generation, before routing.** For each gap in the Priority Queue:
@@ -245,6 +285,19 @@ Update gap count: dependency chains may reveal **hidden gaps** not found in Phas
 ```
 
 **Hard Gate**: If ANY gap has 2+ upstream consumers OR spans 2+ layers → that gap CANNOT be routed to Tier 0. Period.
+
+**Phase A.5 Gate (MUST output before proceeding to B):**
+```
+┌─ PHASE A.5 GATE ───────────────────────────────────┐
+│ Gaps with dependency annotations: {N}/{total}       │
+│ Cross-layer gaps found: {N}                         │
+│ Gaps with 2+ upstream consumers: {N}                │
+│ Tier 0 eligible gaps: {N} (must be 0 if cross-layer)│
+│ Updated gap count after deep-dive: {N}              │
+│ Gate status: PASS / FAIL — {reason if fail}         │
+└─────────────────────────────────────────────────────┘
+```
+Emit JSONL: `{"event":"phase_end","run_id":"...","phase":"A5","cross_layer":{N},"upstream_heavy":{N},"ts":"..."}`
 
 ### Phase B — ROUTE (Tier 2-Biased Adaptive)
 
@@ -299,6 +352,25 @@ When Tier 2 is selected, ADHD MUST invoke `/tkm` to generate work packages:
 3. ADHD formats terminal dispatch packets from /tkm output
 4. Each packet includes: stream title, work package path, method (/tkc or /tk), checkpoint reminder
 
+**Phase B Gate (MUST output before proceeding to C):**
+```
+┌─ PHASE B GATE ──────────────────────────────────────┐
+│ Tier selected: {0|1|2|3}                            │
+│ Justification: {reason}                             │
+│ If Tier 0/1 — downgrade conditions:                 │
+│   □ Gap count ≤ 2: {yes/no}                         │
+│   □ Single layer: {yes/no}                          │
+│   □ Zero upstream consumers: {yes/no}               │
+│   □ No architecture decision: {yes/no}              │
+│ If Tier 2 — /tkm invocation planned: {yes}          │
+│ Streams planned: {N}                                │
+│ Gate status: PASS / FAIL — {reason if fail}         │
+└─────────────────────────────────────────────────────┘
+```
+Emit JSONL: `{"event":"tier_decision","run_id":"...","tier":{N},"gap_count":{N},"streams":{N},"ts":"..."}`
+
+**Invariant: Tier 0/1 with ANY downgrade condition = "no" → Gate FAIL. Escalate to Tier 2.**
+
 ### Phase C — DISPATCH
 
 **For Tier 0:** Output fix instructions directly. Done.
@@ -333,23 +405,32 @@ mkdir -p .claude/state/adhd/runs/<run-id>/streams
 mkdir -p .claude/state/adhd/runs/<run-id>/checkpoints
 ```
 
-Write `manifest.json`:
+Write `manifest.json` (ALL 10 fields required — no exceptions):
 ```json
 {
   "run_id": "run_<date>_<domain>",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
   "domain": "<domain>",
   "tier": 2,
-  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
   "base_sha": "<git HEAD>",
   "streams_count": 3,
   "status": "active",
+  "current_phase": "C",
+  "phase_history": [
+    {"phase": "A", "ts": "...", "exit": "ok"},
+    {"phase": "A5", "ts": "...", "exit": "ok"},
+    {"phase": "B", "ts": "...", "exit": "ok"},
+    {"phase": "C", "ts": "...", "exit": "pending"}
+  ],
   "dhr_path": ".claude/state/adhd/runs/<run-id>/dhr.json"
 }
 ```
+Optional fields go in `"extra": {}` — do NOT invent top-level ad-hoc fields.
 
 Write `dhr.json` (structured DHR for machine consumption).
 
 TKM writes `streams/stream-N.json` with ownership, contracts, acceptance criteria.
+Each stream MUST use status enum: `pending` | `active` | `complete` | `failed`.
 
 #### Step 2: Context Packets (copy-paste ready)
 
@@ -440,29 +521,58 @@ Append to `~/.claude/adhd-runs.jsonl`:
 {"event": "run_started", "run_id": "<id>", "domain": "<domain>", "tier": 2, "streams": 3, "base_sha": "<sha>", "timestamp": "..."}
 ```
 
+**Phase C Gate (MUST output before closing dispatch session):**
+```
+┌─ PHASE C GATE ──────────────────────────────────────┐
+│ /tkm invoked (Tier 2+): {yes/no}                    │
+│ Work packages generated: {N}                        │
+│ File overlap verified (disjoint): {yes/no}          │
+│ Terminal packets output: {N}                        │
+│ manifest.json written with 10 required fields: {yes}│
+│ Convergence reminder in EVERY packet: {yes/no}      │
+│ JSONL run_started emitted: {yes/no}                 │
+│ Gate status: PASS / FAIL — {reason if fail}         │
+└─────────────────────────────────────────────────────┘
+```
+
+**CRITICAL REMINDER in final output to user:**
+```
+⚡ 모든 stream 완료 후 반드시 실행:
+   /adhd verify <domain>
+   이걸 안 하면 convergence verification이 0% — 작업이 검증 없이 끝남.
+```
+
 ### Phase D — CONVERGE (`/adhd verify`)
 
+> Design note (TKC debate 2026-03-30): Phase D was 0/31 execution rate because it was
+> too heavy (2+ blind evaluator rounds mandatory). Simplified to Quick Mode default.
+> The best Phase D is one that actually runs. Full mode available via `--thorough`.
+
 **PULL-based** — does NOT rely on sessions reporting their own completion. Scans git state directly.
+
+**Two modes:**
+- `/adhd verify <domain>` — **Quick Mode (default)**: git diff + checkpoint scan + 1 eval round + graded verdict (~3 min)
+- `/adhd verify <domain> --thorough` — **Full Mode**: 2+ eval rounds + deep grading (~10 min)
 
 #### Step 1: Re-scan (PULL from git)
 
 ```bash
-# What changed since run started?
 git log --oneline <base_sha>..HEAD -- <all owned_files across streams>
 git diff --stat <base_sha>..HEAD -- <all owned_files>
 ```
 
 Read checkpoint JSON sidecars for each stream (if available).
 Read `notices.md` for any inter-session signals.
+Read `manifest.json` — verify `phase_history` shows A→A.5→B→C completed.
 
-#### Step 2: Generate new DHR
-
-Run Phase A again for the same domain. Compare against original DHR.
-
-#### Step 3: Convergence Report
+#### Step 2: Convergence Report
 
 ```markdown
 ## Convergence Report: <domain>
+
+### Stream Status (PULL from git + checkpoints)
+| Stream | Files Changed | Commits | Checkpoint | Status |
+|--------|--------------|---------|------------|--------|
 
 ### Gaps Closed (✅)
 | Gap | Closed By | Commit | Evidence |
@@ -475,95 +585,53 @@ Run Phase A again for the same domain. Compare against original DHR.
 ### New Gaps Discovered (⚠️)
 | Gap | Source | Priority |
 |-----|--------|----------|
-
-### Stream Status (from git scan + checkpoint JSON)
-| Stream | Files Changed | Commits | Checkpoint Progress | Status |
-|--------|--------------|---------|---------------------|--------|
 ```
 
-#### Step 4: Blind Evaluator Loop (Ralph-style — MANDATORY)
+#### Step 3: Cross-Stream Evaluator (1 round for Quick, 2+ for Full)
 
-> "Separating the agent doing the work from the agent judging it proves to be a strong lever."
-> "I ran 5-15 iterations per generation, each pushing in a more distinctive direction."
-> — Anthropic Engineering, 2026-03-24
->
-> **Repetition breeds excellence.** Each evaluation round surfaces issues the prior round missed.
-> 10 rounds of eval produced "distinctive designs" — this is the core philosophy.
-
-**ADHD Phase D now runs Ralph's blind-evaluator loop at the convergence level.**
-This is NOT implementation-level eval (that's Ralph per-stream). This is **cross-stream integration eval**.
-
-**Step 4a: Spawn Cross-Stream Blind Evaluators (PARALLEL)**
-
+**Quick Mode (default):** Spawn 1 blind-evaluator (backend or frontend based on domain):
 ```
-Agent tool (spawn BOTH in one message):
-
-  subagent_type: blind-evaluator-be
-  prompt: "Cross-stream backend convergence eval for ADHD run <run-id>.
+Agent tool:
+  subagent_type: blind-evaluator
+  prompt: "Cross-stream convergence eval for ADHD run <run-id>.
            Read manifest at .claude/state/adhd/runs/<run-id>/manifest.json.
-           For EACH backend stream: grep target symbols, run pytest --testmon -x -q,
-           verify acceptance criteria from work package.
-           Check cross-stream API contracts: do imports match exports?
-           Return PASS or FAIL per stream + cross-stream integration verdict."
-
-  subagent_type: blind-evaluator-fe
-  prompt: "Cross-stream frontend convergence eval for ADHD run <run-id>.
-           Read manifest at .claude/state/adhd/runs/<run-id>/manifest.json.
-           For EACH frontend stream: grep target symbols, run bun run build,
-           check i18n keys in ko.json + en.json, verify acceptance criteria.
-           Check cross-stream component contracts: do shared types match?
-           Return PASS or FAIL per stream + cross-stream integration verdict."
+           For EACH stream: grep target symbols, verify acceptance criteria.
+           Run: pytest --testmon -x -q (backend) or bun run build (frontend).
+           Check cross-stream contracts: do imports match exports?
+           Return PASS or FAIL per stream + integration verdict."
 ```
 
-**Step 4b: Eval Loop (MINIMUM 2 rounds, NO MAXIMUM)**
-
+**Full Mode (`--thorough`):** Spawn BE + FE evaluators in parallel, minimum 2 rounds:
 ```
-Round 1: Spawn evaluators → collect PASS/FAIL per stream
-  IF all PASS → Round 2 (mandatory — single-pass misses ~30%)
-  IF any FAIL → fix findings → re-verify → re-evaluate (new evaluator pair)
+Round 1: blind-evaluator-be + blind-evaluator-fe → PASS/FAIL per stream
+  IF all PASS → Round 2 (mandatory for Full mode)
+  IF any FAIL → report findings (user fixes manually)
 
-Round 2: Spawn NEW evaluators (fresh context, no anchoring to Round 1)
-  IF all PASS → proceed to Step 4c (Graded Verdict)
-  IF any FAIL → fix → re-verify → Round 3
-
-Round 3+: Continue until ALL PASS or iteration_budget exhausted.
-  Each round: new evaluators, new context, new findings.
-  "10 rounds produced distinctive designs" — more rounds = higher quality.
+Round 2: NEW evaluator pair (fresh context) → final verdict
 ```
 
-**Step 4c: Graded Verdict (AFTER eval loop PASS)**
-
-> Adapted from Anthropic evaluator: "I wrote four grading criteria... each criterion
-> had a hard threshold, and if any one fell below it, the sprint failed."
+#### Step 4: Graded Verdict
 
 Grade convergence against 4 criteria:
 
 | Criterion | Weight | Question | Grade /10 |
 |---|---|---|---|
-| Completeness | 30% | All gaps closed? Stubbed features? Output contracts honored? | |
-| Correctness | 25% | Implementation actually works? Tests pass? Evidence provided? | |
-| Integration | 25% | Cross-stream connections work? Import/export contracts match? | |
-| Quality | 20% | Production-ready? Hardening debt? Rule 14 compliance? | |
+| Completeness | 30% | All gaps closed? Output contracts honored? | |
+| Correctness | 25% | Tests pass? Evidence provided? | |
+| Integration | 25% | Cross-stream connections work? | |
+| Quality | 20% | Production-ready? Rule 14 compliance? | |
 
 **Thresholds:**
 - Weighted average ≥ 7.0 = **PASS** → COMPLETE
 - Any single criterion < 5.0 = **FAIL** regardless of average
-- Weighted average 5.0-6.9 = **CONDITIONAL** → iteration decision needed
+- Weighted average 5.0-6.9 = **CONDITIONAL** → user decides next action
 
-**Step 4d: Iteration Decision** (from P7 Iteration Loop):
+**Iteration Decision:**
 | Condition | Action |
 |---|---|
-| All ≥ 7.0 AND eval loop PASS x2 | COMPLETE |
-| 1-2 criteria < 7.0, scores trending up | REFINE (fix weak areas, same approach) |
-| 2+ criteria < 5.0 or scores trending down | PIVOT (re-enter Phase B with revised DHR) |
-| iteration_budget exhausted | "Convergence requires manual judgment" + full report |
-
-**Re-dispatch protocol:**
-When REFINE or PIVOT → decrement iteration_budget → re-enter Phase C with:
-- Updated DHR (Phase D re-scan results)
-- Specific QA feedback per failing criterion
-- Blind evaluator findings from failed rounds
-- "Fix failed areas first, then re-test" (generator rule from Anthropic harness)
+| All ≥ 7.0 | COMPLETE — update manifest status + emit JSONL |
+| 1-2 criteria < 7.0 | CONDITIONAL — report findings, user re-dispatches if needed |
+| Any criterion < 5.0 | FAIL — report findings, recommend re-dispatch with specific QA feedback |
 
 #### Step 5: Verify Mesh
 
@@ -572,12 +640,41 @@ Run verification based on touched files:
 - Frontend files → `verify-implementation` + `verify-ui-consistency`
 - All → regression gate: `after_failures ≤ before_failures`
 
-#### Step 6: Observability
+#### Step 6: Finalize
 
-Append to `~/.claude/adhd-runs.jsonl`:
+Update manifest.json:
 ```json
-{"event": "converge", "run_id": "<id>", "gaps_closed": 5, "gaps_remaining": 2, "gaps_new": 1, "convergence_pct": 71, "timestamp": "..."}
+{
+  "status": "completed",
+  "current_phase": "D",
+  "phase_history": [..., {"phase": "D", "ts": "...", "exit": "ok"}],
+  "convergence": {
+    "eval_rounds": 1,
+    "grades": {"completeness": 8, "correctness": 7, "integration": 7, "quality": 7},
+    "weighted_avg": 7.3,
+    "verdict": "PASS"
+  }
+}
 ```
+
+**Phase D Gate (MUST output before declaring COMPLETE):**
+```
+┌─ PHASE D GATE ──────────────────────────────────────┐
+│ Git diff scanned: {yes/no}                          │
+│ Checkpoints read: {N}/{total_streams}               │
+│ Evaluator spawned: {yes/no} — verdict: {PASS/FAIL}  │
+│ Graded verdict: C={N} R={N} I={N} Q={N} avg={N}    │
+│ Manifest updated with convergence: {yes/no}         │
+│ Gate status: PASS / FAIL — {reason if fail}         │
+└─────────────────────────────────────────────────────┘
+```
+
+Emit JSONL:
+```json
+{"event":"converge","run_id":"<id>","gaps_closed":{N},"gaps_remaining":{N},"verdict":"PASS|FAIL|CONDITIONAL","grades":{"c":{N},"r":{N},"i":{N},"q":{N}},"ts":"..."}
+```
+
+**A run with no Phase D JSONL event = unverified. Dashboard shows ⚠️ UNVERIFIED.**
 
 ## Dashboard Mode (`/adhd` without arguments)
 
@@ -589,12 +686,19 @@ Append to `~/.claude/adhd-runs.jsonl`:
 |--------|------------|-------------|-------------|------|----------|
 
 ### Active ADHD Runs
-| Run ID | Domain | Tier | Streams | Status | Base SHA | Age |
-|--------|--------|------|---------|--------|----------|-----|
+| Run ID | Domain | Tier | Streams | Status | Phase D | Age |
+|--------|--------|------|---------|--------|---------|-----|
+| ... | ... | ... | ... | active | ⚠️ UNVERIFIED | 3d |
+| ... | ... | ... | ... | completed | ✅ PASS (7.3) | 1d |
+| ... | ... | ... | ... | active | — | 8d ⚠️ STALE |
 
 ### Recommended Focus (Rule 11 compliant)
 1. <domain> (highest gap count)
 2. <domain> (dependency of above)
+
+### Stale Runs (>7 days, no recent checkpoint)
+| Run ID | Age | Last Activity | Action |
+|--------|-----|---------------|--------|
 ```
 
 ## Graceful Degradation
@@ -637,6 +741,36 @@ Activate: Set environment variable or pass `--stateless` flag.
 - Max write-stream count advisory: 4 (warn at >4, hard warn at >6)
 - `/adhd verify` re-enters Phase B at most 2 times
 - Max 1 active ADHD run per domain (prevent overlapping runs)
+
+### Sub-Skill Crash Protocol (stop_failure)
+
+> 31개 run 분석: 23 stop_failure events (33% of all events), 전부 TKC.
+> Sub-skill crash 시 대응 프로토콜이 없으면 stream이 영원히 stale.
+
+When a sub-skill (/tkc, /tk, /ralph) crashes during stream execution:
+
+| Failure | Action |
+|---------|--------|
+| /tkc crash (1st time) | Retry once. If fails again → downgrade to direct implementation (skip debate). |
+| /tk crash (Codex MCP) | Fall back to /tkc. Log: `{"event":"fallback","from":"tk","to":"tkc",...}` |
+| /ralph crash | Check state file. If Phase 1+ complete → resume from last cycle. If Phase 0 → restart. |
+| Multiple crashes (3+) in same run | **STOP the stream.** Mark stream status = `failed`. Report in notices.md. |
+
+### Run Lifecycle
+
+> 31 run directories, most status="active" since March 22. No cleanup mechanism.
+
+**Stale Run Detection (Dashboard mode):**
+- Run age > 7 days with no checkpoint updates → mark `⚠️ STALE` in dashboard
+- Run age > 14 days → mark `⚠️ EXPIRED — consider archiving or re-running`
+- Recommend: `mv .claude/state/adhd/runs/<stale-run> .claude/state/adhd/archived/`
+
+**Run cannot be "completed" without:**
+1. `convergence` field in manifest (from Phase D)
+2. At least 1 `converge` event in JSONL
+3. `current_phase` = "D" in manifest
+
+Runs without these → status remains "active" or "abandoned" (never "completed").
 
 ## Anti-Patterns
 
@@ -681,17 +815,23 @@ For `/adhd verify`:
 ```
 ## /adhd verify: <domain>
 
-### Re-scan DHR (PULL-based)
-{Updated Domain Health Report from git scan}
+### Re-scan (PULL from git)
+{git diff + checkpoint scan results}
 
 ### Convergence Report
-{Gaps Closed / Remaining / New}
+{Gaps Closed / Remaining / New + Stream Status table}
 
-### Stream Status
-{Per-stream progress from git + checkpoint JSON}
+### Evaluator Verdict
+{blind-evaluator PASS/FAIL per stream + integration}
+
+### Graded Verdict
+{Completeness/Correctness/Integration/Quality scores + weighted avg}
+
+### Phase D Gate
+{Structured gate checklist}
 
 ### Verdict
-{COMPLETE / RE-ENTER / DEFER}
+{COMPLETE / CONDITIONAL / FAIL}
 
 ### Verification Mesh
 {verify-implementation + verify-ui-consistency results}

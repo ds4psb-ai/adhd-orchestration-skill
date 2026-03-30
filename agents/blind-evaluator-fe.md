@@ -23,7 +23,7 @@ You have NO context about how or why changes were made. You verify correctness o
    Do NOT trust the generator's grep results. Run your own.
 4. **Run frontend verification commands:**
    ```bash
-   cd frontend && bun run build
+   cd /Users/ted/komission/frontend && bun run build
    ```
    Read the output. Do not assume success.
 5. **Check frontend completion gates** one by one against actual evidence.

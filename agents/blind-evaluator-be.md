@@ -23,7 +23,7 @@ You have NO context about how or why changes were made. You verify correctness o
    Do NOT trust the generator's grep results. Run your own.
 4. **Run backend verification commands:**
    ```bash
-   cd backend && source venv/bin/activate && pytest --testmon -x -q
+   cd /Users/ted/komission/backend && source venv/bin/activate && pytest --testmon -x -q
    ```
    Read the output. Do not assume success.
 5. **Check backend completion gates** one by one against actual evidence.

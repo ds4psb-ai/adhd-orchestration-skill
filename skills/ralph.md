@@ -1,6 +1,6 @@
 ---
 name: ralph
-description: "Persistent execution harness — Generator + Blind Evaluator loop with external state"
+description: "Komission persistent execution harness — Generator + Blind Evaluator loop with external state"
 argument-hint: "TASK_DESCRIPTION"
 ---
 
@@ -229,8 +229,8 @@ rg -n "symbol_name" backend/ frontend/
 
 ### Layer 1: Tests + Build
 ```bash
-cd backend && source venv/bin/activate && pytest --testmon -x -q
-cd frontend && bun run build
+cd /Users/ted/komission/backend && source venv/bin/activate && pytest --testmon -x -q
+cd /Users/ted/komission/frontend && bun run build
 ```
 **Read the output. Copy the summary line. Do not say "passes" unless you saw it.**
 
@@ -323,6 +323,13 @@ After all gates pass:
 This exists because completed work that isn't committed gets lost or conflicts with parallel work.
 
 ---
+
+## Domain Rules (Komission)
+- VDG statuses: `queued`, `failed`, `dispatched`, `completed`, `skipped`, `dead`, `cancelled`
+- Model names from `config.py` only
+- DB writes via lifecycle primitives only
+- `normalize_vdg_schema()` for all VDG access
+- Neo4j: graceful degradation
 
 ## Escalation
 - Same failure 3+ iterations → blocker, ask user

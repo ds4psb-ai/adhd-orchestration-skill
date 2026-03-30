@@ -5,7 +5,9 @@
 > **"Separating the agent doing the work from the agent judging it proves to be a strong lever."**
 > — [Anthropic Engineering, Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
 
-A multi-terminal orchestration system that turns scattered parallel work into structured, convergent execution. The core idea: **the agent writing code never judges its own work.** A blind evaluator does. And it runs until the evaluator says PASS — then runs again, because single-pass verification misses ~30% of issues.
+A multi-terminal orchestration system that turns scattered parallel work into structured, convergent execution. The core idea: **the agent writing code never judges its own work.** A blind evaluator does. And it runs until the evaluator says PASS.
+
+**v2 (2026-03-30):** Enforcement Architecture — Phase Completion Gates, manifest schema contract (10 required fields), per-phase observability (7 JSONL event types), Phase D Quick Mode, sub-skill crash protocol, and run lifecycle management. Derived from analysis of 31 production runs that revealed 0% Phase D execution rate under the original spec.
 
 **Author**: [ds4psb-ai](https://github.com/ds4psb-ai/)
 **License**: MIT + Attribution
@@ -24,7 +26,7 @@ This project implements the **Generator↔Evaluator harness pattern** from Anthr
 
 1. **Generator and Evaluator are separate agents.** The generator writes code. A blind evaluator — running Opus in a fresh context with zero knowledge of the generator's reasoning — judges it. This structural separation is the single biggest lever for quality.
 
-2. **Repetition breeds excellence.** Anthropic ran 5–15 iterations per generation, each pushing in a more distinctive direction. We adopt this: more eval rounds = higher quality output. Token cost is irrelevant. The harness runs until PASS, then runs again to catch what the first pass missed.
+2. **The best verification is one that actually runs.** v1 mandated 2+ blind evaluator rounds, which resulted in 0/31 runs executing Phase D at all. v2 introduces Quick Mode (1 eval round, ~3 min) as the default — because one round that runs beats two rounds that don't. Full Mode (`--thorough`, 2+ rounds) is available for high-stakes convergence.
 
 3. **Debate before implementation.** Every non-trivial change goes through structured debate (TKC or TK) before a single line of code is written. The debate produces a `handoff.json` contract that the execution harness consumes.
 
@@ -55,8 +57,8 @@ This project implements the **Generator↔Evaluator harness pattern** from Anthr
   └──────────┬───────────┘
              │
          ┌───▼────┐
-         │ /adhd   │  Converge: PULL-based git scan + cross-stream eval
-         │ verify  │  Graded verdict (not binary). Iterate if needed.
+         │ /adhd   │  Converge: PULL-based git scan + evaluator + graded verdict
+         │ verify  │  Quick Mode (~3min) or Full Mode (--thorough, ~10min)
          └────────┘
 ```
 
@@ -130,6 +132,22 @@ Ralph reads this on startup, pre-populates its investigation hints, then deletes
 | **3: Team** | Production incident | Agent Teams |
 
 **Tier 2 is the default.** ADHD exists to distribute work. Single-terminal is the exception.
+
+### Phase Completion Gates (v2)
+
+Each phase outputs a structured gate checklist before the next phase can begin. Gates use fill-in templates — not prose MUSTs — because models follow output format instructions more reliably than behavioral constraints.
+
+```
+┌─ PHASE A GATE ─────────────────────────────────────┐
+│ Agents spawned: 3 (min 3)       ✅                  │
+│ Findings per agent: {a1:5, a2:3, a3:4} (min 3 each)│
+│ Gap count (individual items): 12                    │
+│ DHR written to: .../dhr.json                        │
+│ Gate status: PASS                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+Gates exist for Phase A, A.5, B, C, and D. Each emits a JSONL observability event.
 
 ### Anti-Deflation
 
@@ -240,12 +258,13 @@ adhd-orchestration-skill/
 ## Design Decisions
 
 1. **Generator never judges its own work.** Blind evaluator with fresh context, Opus model, mandatory skepticism.
-2. **Minimum 2 eval rounds.** Single-pass misses ~30%. The second round catches what the first missed.
+2. **The best Phase D is one that runs.** v1's mandatory 2+ eval rounds achieved 0% execution. v2 defaults to Quick Mode (1 round, ~3 min). Pragmatism over perfection.
 3. **Debate produces artifacts, not just conclusions.** `handoff.json` carries structured evidence from debate into execution.
 4. **PULL-based convergence.** ADHD doesn't trust sessions to self-report. It scans git state directly.
 5. **Every skill is sovereign.** Works standalone or ADHD-routed. No vendor lock-in to the orchestrator.
 6. **External validation > self-assessment.** Witness mesh hooks enforce output completeness because LLM self-grading is unreliable.
 7. **All paths end at /ralph.** Even trivial changes get blind-evaluator verification. The harness is non-negotiable.
+8. **Enforcement via structure, not prose.** Phase Completion Gates use fill-in templates that models follow reliably, replacing scattered MUST keywords that were ignored ~70% of the time (measured across 31 runs).
 
 ## Contributing
 
