@@ -99,8 +99,12 @@ jobs:
         run: |
           cd /tmp/test-project
           echo "--- Checking skill files ---"
-          for skill in adhd tkm tk tkc tktk verify-implementation; do
+          for skill in adhd tkm tk tkc ralph verify-implementation; do
             test -f ".claude/skills/$skill/SKILL.md" && echo "✓ $skill" || { echo "✗ $skill MISSING"; exit 1; }
+          done
+          echo "--- Checking agents ---"
+          for agent in blind-evaluator blind-evaluator-be blind-evaluator-fe; do
+            test -f ".claude/agents/$agent.md" && echo "✓ $agent" || { echo "✗ $agent MISSING"; exit 1; }
           done
           echo "--- Checking scripts ---"
           test -f .claude/skills/verify-implementation/scripts/run_registry_checks.py && echo "✓ run_registry_checks.py"

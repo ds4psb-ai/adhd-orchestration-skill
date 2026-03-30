@@ -180,7 +180,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ds4psb-ai/adhd-orchestration
 
 ```bash
 # Skills
-mkdir -p .claude/skills/{adhd,tkm,tk,tkc,ralph}
+mkdir -p .claude/skills/{adhd,tkm,tk,tkc,ralph,verify-implementation}
 mkdir -p .claude/{commands,hooks,agents}
 
 cp skills/adhd.md   .claude/skills/adhd/SKILL.md
@@ -191,12 +191,10 @@ cp skills/ralph.md  .claude/skills/ralph/SKILL.md
 cp skills/verify-implementation.md .claude/skills/verify-implementation/SKILL.md
 cp commands/checkpoint.md .claude/commands/checkpoint.md
 
-# Blind evaluator agents (Opus)
 cp agents/blind-evaluator.md    .claude/agents/blind-evaluator.md
 cp agents/blind-evaluator-be.md .claude/agents/blind-evaluator-be.md
 cp agents/blind-evaluator-fe.md .claude/agents/blind-evaluator-fe.md
 
-# Witness mesh hooks
 cp hooks/skill-witness.sh  .claude/hooks/skill-witness.sh
 cp hooks/explore-witness.sh .claude/hooks/explore-witness.sh
 chmod +x .claude/hooks/*.sh

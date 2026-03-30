@@ -18,16 +18,23 @@ command -v curl >/dev/null 2>&1 || fail "curl is required"
 info "Installing ADHD Orchestration Skills into $(pwd)/.claude/"
 
 # Create directories
-mkdir -p .claude/skills/{adhd,tkm,tk,tkc,tktk,verify-implementation/scripts,manage-skills/scripts}
-mkdir -p .claude/{commands,hooks,reports}
+mkdir -p .claude/skills/{adhd,tkm,tk,tkc,ralph,verify-implementation/scripts,manage-skills/scripts}
+mkdir -p .claude/{commands,hooks,agents,reports}
 
 # Download skills
-SKILLS=(adhd tkm tk tkc tktk)
+SKILLS=(adhd tkm tk tkc ralph)
 for skill in "${SKILLS[@]}"; do
   curl -fsSL "$BASE/skills/$skill.md" -o ".claude/skills/$skill/SKILL.md"
 done
 curl -fsSL "$BASE/skills/verify-implementation.md" -o ".claude/skills/verify-implementation/SKILL.md"
-ok "Skills: adhd, tkm, tk, tkc, tktk, verify-implementation"
+ok "Skills: adhd, tkm, tk, tkc, ralph, verify-implementation"
+
+# Download agents (blind evaluators — Opus)
+AGENTS=(blind-evaluator blind-evaluator-be blind-evaluator-fe)
+for agent in "${AGENTS[@]}"; do
+  curl -fsSL "$BASE/agents/$agent.md" -o ".claude/agents/$agent.md"
+done
+ok "Agents: blind-evaluator, blind-evaluator-be, blind-evaluator-fe"
 
 # Download scripts
 curl -fsSL "$BASE/scripts/run_registry_checks.py"  -o ".claude/skills/verify-implementation/scripts/run_registry_checks.py"
@@ -52,12 +59,12 @@ echo ""
 echo "    ## Skills"
 echo "    - /adhd — Mothership orchestrator (diagnose → route → dispatch → converge)"
 echo "    - /tkm  — Parallel work package generator"
-echo "    - /tk   — Claude↔Codex 2-round debate"
+echo "    - /tk   — Claude↔Codex debate (2-round default, 3-round with --deep)"
 echo "    - /tkc  — Claude self-debate (no MCP needed)"
-echo "    - /tktk — Deep 3-round research debate"
+echo "    - /ralph — Execution harness (Generator + Blind Evaluator loop)"
 echo "    - /verify-implementation — Diff-aware verification mesh"
 echo "    - /checkpoint — Session state persistence"
 echo ""
-echo "  Optional: install Codex CLI for dual-model debates (/tk, /tktk):"
+echo "  Optional: install Codex CLI for dual-model debates (/tk):"
 echo "    npm install -g @openai/codex"
 echo ""
